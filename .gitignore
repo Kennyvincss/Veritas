@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+contracts/out/
+contracts/cache/
+.foundry/
+.circle/
+*.dat

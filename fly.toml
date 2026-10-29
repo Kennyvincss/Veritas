@@ -1,0 +1,43 @@
+# Fly.io configuration for VERIPAY AI backend server
+# Deploy with: fly deploy
+# Set secrets with: fly secrets set ANTHROPIC_API_KEY=sk-ant-...
+
+app = "veripay-ai"
+primary_region = "iad"  # US East — change to your nearest region
+
+[build]
+  # Fly auto-detects Bun from bun.lock — no custom Dockerfile needed
+
+[env]
+  PORT = "3001"
+  NODE_ENV = "production"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 3001
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/ai-status"
+    protocol = "http"
+    tls_skip_verify = false
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

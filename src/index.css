@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * VERIPAY — Light mode (CityPay-inspired)
+ * Canvas: soft lavender-grey. Cards: white with shadow.
+ * Accent: dark navy (#1a2e4a). Sidebar: white panel.
+ */
+:root {
+  /* Canvas — soft lavender (Jobsync-style) */
+  --bg: #eef0f8;
+  --bg-gradient: linear-gradient(160deg, #f0f2fa 0%, #eaecf6 50%, #eef0f8 100%);
+
+  /* Card surfaces */
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-muted: #f4f5fb;
+  --surface-sidebar: #ffffff;
+
+  /* Typography */
+  --ink: #111827;
+  --ink-2: #1f2937;
+  --muted: #4b5563;
+  --subtle: #9ca3af;
+
+  /* Borders */
+  --border: rgba(17, 24, 39, 0.08);
+  --border-strong: rgba(17, 24, 39, 0.22);
+
+  /* Accent — green (Jobsync "Details" button style) */
+  --accent: #111827;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(17, 24, 39, 0.07);
+
+  /* CTA blue — primary action buttons */
+  --cta: #1d4ed8;
+  --cta-hover: #1e40af;
+  --cta-soft: rgba(29, 78, 216, 0.10);
+
+  /* Dark nav surface (Jobsync top bar) */
+  --nav-bg: #111827;
+  --nav-ink: #f9fafb;
+  --nav-muted: #9ca3af;
+  --nav-border: rgba(255,255,255,0.08);
+
+  /* Semantic */
+  --success: #1d4ed8;
+  --success-bg: rgba(29, 78, 216, 0.09);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.08);
+
+  /* Shadows */
+  --shadow-card: 0 1px 8px rgba(17,24,39,0.06), 0 1px 2px rgba(17,24,39,0.04);
+  --shadow-sidebar: 2px 0 12px rgba(17,24,39,0.05);
+  --shadow-panel: 4px 0 24px rgba(17,24,39,0.10);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100dvh;
+  background: var(--bg-gradient);
+  color: var(--ink);
+}
+
+.display {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', Menlo, monospace;
+}
