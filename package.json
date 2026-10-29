@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "start": "bun run server/ai.ts",
+    "build": "vite build",
+    "serve": "bun run server/ai.ts",
     "server": "bun run server/ai.ts",
     "deploy:self": "bun run ./scripts/self-deploy.ts",
     "compass:deploy": "bun run ./scripts/compass-deploy.ts",
