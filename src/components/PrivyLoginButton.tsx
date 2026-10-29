@@ -16,7 +16,7 @@ interface PrivyLoginButtonProps {
 }
 
 export function PrivyLoginButton({ variant = 'nav', onProfileClick }: PrivyLoginButtonProps) {
-  const { isConnected, address, displayName, avatarUrl, login, logout, isPrivy } = usePrivyAccount()
+  const { isConnected, address, displayName, avatarUrl, login, logout, isPrivy, isReady } = usePrivyAccount()
 
   if (!isPrivy) {
     // No Privy App ID — show a muted notice
@@ -37,17 +37,18 @@ export function PrivyLoginButton({ variant = 'nav', onProfileClick }: PrivyLogin
   if (!isConnected) {
     return (
       <button
-        onClick={login}
+        onClick={isReady ? login : undefined}
+        disabled={!isReady}
         className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-600 transition-colors min-h-[36px]"
-        style={
-          variant === 'nav'
-            ? { background: 'var(--cta)', color: '#fff' }
-            : { background: 'var(--cta)', color: '#fff' }
-        }
-        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cta-hover)')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--cta)')}
+        style={{
+          background: isReady ? 'var(--cta)' : 'var(--surface-muted)',
+          color: isReady ? '#fff' : 'var(--subtle)',
+          cursor: isReady ? 'pointer' : 'default',
+        }}
+        onMouseEnter={(e) => { if (isReady) e.currentTarget.style.background = 'var(--cta-hover)' }}
+        onMouseLeave={(e) => { if (isReady) e.currentTarget.style.background = 'var(--cta)' }}
       >
-        Sign in
+        {isReady ? 'Sign in' : 'Loading…'}
       </button>
     )
   }

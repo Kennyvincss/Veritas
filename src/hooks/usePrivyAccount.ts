@@ -15,6 +15,7 @@ export interface PrivyAccountResult {
   isConnected: boolean
   chainId: number | undefined
   isPrivy: boolean
+  isReady: boolean
   login: () => void
   logout: () => void
   displayName: string | null
@@ -34,6 +35,7 @@ export function usePrivyAccount(): PrivyAccountResult {
       isConnected: false,
       chainId: undefined,
       isPrivy: false,
+      isReady: true,
       login: () => {},
       logout: () => {},
       displayName: null,
@@ -65,14 +67,23 @@ export function usePrivyAccount(): PrivyAccountResult {
   // Wrap async logout as void to avoid promise-in-void-attribute lint
   const handleLogout = () => { void logout() }
 
+  // Any wallet address — embedded first, then injected (MetaMask etc)
+  const anyAddress = embeddedAddress
+    ?? (wallets[0]?.address as `0x${string}` | undefined)
+
+  // Connected = authenticated. Wallet address may arrive a few seconds
+  // after login while Privy creates the embedded wallet in the background.
+  const isConnected = ready && authenticated
+
   return {
-    address: embeddedAddress,
-    isConnected: ready && authenticated && !!embeddedAddress,
+    address: anyAddress,
+    isConnected,
     chainId: 5042002,
     isPrivy: true,
+    isReady: ready,
     login,
     logout: handleLogout,
     displayName,
-    avatarUrl: null, // Privy v3 does not expose profile pictures in the user object
+    avatarUrl: null,
   }
 }
