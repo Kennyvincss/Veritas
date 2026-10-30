@@ -10,6 +10,7 @@
 import { BarChart2, Home, PlusSquare, Trophy, User, ArrowLeftRight } from 'lucide-react'
 import { usePrivyAccount } from '@/hooks/usePrivyAccount'
 import { PrivyLoginButton } from './PrivyLoginButton'
+import { NotificationBell } from './NotificationBell'
 import { cn, formatAddress } from '@/lib/utils'
 import { VeriPayLogo } from './VeriPayLogo'
 import type { UserRole } from '@/hooks/useRole'
@@ -21,6 +22,7 @@ interface NavBarProps {
   isSwitchedToCreator: boolean
   onSwitchToCreator: () => void
   onSwitchBackToFreelancer: () => void
+  onBountyNotifClick?: (bountyId: string) => void
 }
 
 export function NavBar({
@@ -30,6 +32,7 @@ export function NavBar({
   isSwitchedToCreator,
   onSwitchToCreator,
   onSwitchBackToFreelancer,
+  onBountyNotifClick,
 }: NavBarProps) {
   const { address, isConnected } = usePrivyAccount()
 
@@ -170,6 +173,9 @@ export function NavBar({
             </button>
           )}
 
+          {isConnected && (
+            <NotificationBell address={address} onBountyClick={onBountyNotifClick} />
+          )}
           <PrivyLoginButton
             variant="nav"
             onProfileClick={isConnected && address ? handleProfileNav : undefined}

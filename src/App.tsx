@@ -19,7 +19,7 @@ import { ReceiptVerifyPage } from './components/ReceiptVerifyPage'
 import { PostGigPage } from './components/PostGigPage'
 import { GigsMarketplace } from './components/GigsMarketplace'
 import { useOnchainBounties } from './hooks/useOnchainBounties'
-import { useSubmissions } from './hooks/useSubmissions'
+import { useServerSubmissions } from './hooks/useServerSubmissions'
 import { useArcNetwork } from './hooks/useArcNetwork'
 import { usePlatformStats } from './hooks/usePlatformStats'
 import { useRole } from './hooks/useRole'
@@ -180,7 +180,7 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
   } = useRole()
 
   const { bounties, isLoading, error, refetch } = useOnchainBounties()
-  const submissionsApi = useSubmissions()
+  const submissionsApi = useServerSubmissions()
   const stats = usePlatformStats(bounties, submissionsApi.submissions)
 
   function navigate(v: string, addr?: string) {
@@ -332,6 +332,7 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
         isSwitchedToCreator={isSwitchedToCreator}
         onSwitchToCreator={switchToCreator}
         onSwitchBackToFreelancer={switchBackToFreelancer}
+        onBountyNotifClick={openBounty}
       />
 
       {/* pb accounts for the two-row mobile bottom nav (~96px total) */}

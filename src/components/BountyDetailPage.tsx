@@ -35,7 +35,28 @@ import {
 import { BountyStatusBadge, SubmissionStatusBadge } from './StatusBadge'
 import type { Bounty, Submission, SubmissionStatus, DeliverableLink } from '@/types/bounty'
 import { ARC_TESTNET_CHAIN_ID, ESCROW_ADDRESS, getEscrowAddress, getExplorerBase, isArcChain } from '@/contracts/VeritasEscrow'
-import type { UseSubmissionsResult } from '@/hooks/useSubmissions'
+// Structural interface — accepts both useSubmissions and useServerSubmissions
+interface SubmissionsApi {
+  hasSubmitted: (bountyId: string, contributor: string) => boolean
+  submit: (params: {
+    bountyId: string
+    bountyTitle: string
+    bountyOwner: string
+    contributor: string
+    title: string
+    summary: string
+    deliverables: Array<{ label: string; url: string }>
+  }) => { ok: true; submission: import('@/types/bounty').Submission } | { ok: false; error: string } | Promise<{ ok: true; submission: import('@/types/bounty').Submission } | { ok: false; error: string }>
+  updateStatus: (
+    submissionId: string,
+    newStatus: string,
+    ownerAddress: string,
+    bountyOwner?: string,
+    creatorNote?: string,
+  ) => { ok: true } | { ok: false; error: string } | Promise<{ ok: true } | { ok: false; error: string }>
+  markApproved?: (submissionId: string) => void
+  markPaid: (submissionId: string, txHash: string) => void | Promise<void>
+}
 import { useApproveAndPay, useReleasePayment } from '@/hooks/useApproveAndPay'
 import { useCancelBounty } from '@/hooks/useCancelBounty'
 import { useReceipts } from '@/hooks/useReceipts'
@@ -58,7 +79,7 @@ const OFFCHAIN_STATUS_ACTIONS: { status: SubmissionStatus; label: string; color:
 interface BountyDetailPageProps {
   bounty: Bounty
   submissions: Submission[]
-  submissionsApi: UseSubmissionsResult
+  submissionsApi: SubmissionsApi
   onBack: () => void
   onRefresh?: () => void
   onProfileClick?: (address: string) => void
@@ -208,24 +229,26 @@ export function BountyDetailPage({
   function handleConfirmSubmit() {
     if (!address) return
     setSubmitError('')
-    const result = submissionsApi.submit({
+    void Promise.resolve(submissionsApi.submit({
       bountyId: bounty.id,
+      bountyTitle: bounty.title,
       bountyOwner: bounty.owner,
       contributor: address,
       title: formTitle.trim(),
       summary: summary.trim(),
       deliverables: deliverables.filter((d) => d.url.trim()),
+    })).then((result) => {
+      if (result.ok) {
+        setSuccessId(result.submission.id)
+        setShowConfirm(false)
+        setFormTitle('')
+        setSummary('')
+        setDeliverables([emptyLink()])
+      } else {
+        setSubmitError(result.error)
+        setShowConfirm(false)
+      }
     })
-    if (result.ok) {
-      setSuccessId(result.submission.id)
-      setShowConfirm(false)
-      setFormTitle('')
-      setSummary('')
-      setDeliverables([emptyLink()])
-    } else {
-      setSubmitError(result.error)
-      setShowConfirm(false)
-    }
   }
 
   // ── Offchain status update ────────────────────────────────────────────────
@@ -233,7 +256,7 @@ export function BountyDetailPage({
   function handleOffchainStatusChange(submissionId: string, newStatus: SubmissionStatus) {
     if (!address) return
     const note = noteInputs[submissionId] ?? ''
-    const result = submissionsApi.updateStatus(submissionId, newStatus, address, bounty.owner, note || undefined)
+    void Promise.resolve(submissionsApi.updateStatus(submissionId, newStatus, address, bounty.owner, note || undefined)).then((result) => {
     if (result.ok) {
       const msg = newStatus === 'rejected'
         ? 'Submission rejected.'
@@ -246,6 +269,7 @@ export function BountyDetailPage({
     } else {
       setReviewFeedback((prev) => ({ ...prev, [submissionId]: result.error }))
     }
+    })
   }
 
   // ── Onchain approval flow ─────────────────────────────────────────────────
@@ -260,11 +284,11 @@ export function BountyDetailPage({
       contributorAddress: sub.contributor,
       submissionId: sub.id,
       onApproved: () => {
-        submissionsApi.markApproved(sub.id)
+        submissionsApi.markApproved?.(sub.id)
         toast.success('Contributor approved onchain. Releasing payment…')
       },
       onPaid: (txHash) => {
-        submissionsApi.markPaid(sub.id, txHash)
+        void Promise.resolve(submissionsApi.markPaid(sub.id, txHash))
         toast.success('Payment confirmed! USDC has been sent to the contributor.')
         onRefresh?.()
         // Create Proof-of-Work Receipt
@@ -586,7 +610,7 @@ export function BountyDetailPage({
                   const matched = submissions.find(
                     (s) => s.contributor.toLowerCase() === bounty.approvedContributor?.toLowerCase(),
                   )
-                  if (matched) submissionsApi.markPaid(matched.id, txHash)
+                  if (matched) void Promise.resolve(submissionsApi.markPaid(matched.id, txHash))
                   toast.success('Payment confirmed! USDC sent to contributor.')
                   onRefresh?.()
                   // Create Proof-of-Work Receipt (resume path)

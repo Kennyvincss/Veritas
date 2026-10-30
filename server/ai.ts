@@ -557,6 +557,180 @@ app.post('/api/evaluate', rateLimit, async (req: Request, res: ExpressResponse) 
   })
 })
 
+// ── Shared submissions store ──────────────────────────────────────────────────
+// In-memory store. Survives for the lifetime of the server process.
+// On Fly.io this is one instance — suitable for MVP/demo use.
+// Replace with a DB (SQLite, Postgres) for production multi-instance.
+
+interface ServerSubmission {
+  id: string
+  bountyId: string
+  bountyTitle: string
+  bountyOwner: string
+  contributor: string
+  title: string
+  summary: string
+  deliverables: Array<{ label: string; url: string }>
+  status: string
+  submittedAt: number
+  updatedAt: number
+  txHash?: string
+  creatorNote?: string
+}
+
+const submissions = new Map<string, ServerSubmission>()
+
+// Notifications store
+interface ServerNotification {
+  id: string
+  recipientAddress: string   // lowercase
+  type: 'new_submission' | 'status_update' | 'payment_released' | 'bounty_cancelled'
+  title: string
+  message: string
+  bountyId: string
+  submissionId?: string
+  createdAt: number
+  read: boolean
+}
+
+const notifications: ServerNotification[] = []
+let notifCounter = 0
+
+function newId() { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` }
+
+function addNotification(n: Omit<ServerNotification, 'id' | 'createdAt' | 'read'>) {
+  if (notifCounter > 5000) notifications.splice(0, 1000) // cap memory
+  notifCounter++
+  notifications.push({ ...n, id: newId(), createdAt: Date.now(), read: false })
+}
+
+// GET /api/submissions?bountyId=xxx  — returns all submissions for a bounty
+app.get('/api/submissions', (req: Request, res: ExpressResponse) => {
+  const bountyId = typeof req.query['bountyId'] === 'string' ? req.query['bountyId'] : null
+  const contributor = typeof req.query['contributor'] === 'string' ? req.query['contributor'].toLowerCase() : null
+  let result = [...submissions.values()]
+  if (bountyId) result = result.filter((s) => s.bountyId === bountyId)
+  if (contributor) result = result.filter((s) => s.contributor.toLowerCase() === contributor)
+  res.json({ ok: true, submissions: result })
+})
+
+// POST /api/submissions — create a new submission
+app.post('/api/submissions', (req: Request, res: ExpressResponse) => {
+  const b = req.body as Record<string, unknown>
+  const str = (v: unknown, fb = '') => typeof v === 'string' ? v.trim() : fb
+  const bountyId = str(b['bountyId'])
+  const bountyTitle = str(b['bountyTitle'])
+  const bountyOwner = str(b['bountyOwner']).toLowerCase()
+  const contributor = str(b['contributor']).toLowerCase()
+  const title = str(b['title']).slice(0, 150)
+  const summary = str(b['summary']).slice(0, 4000)
+  const rawDels = Array.isArray(b['deliverables']) ? b['deliverables'] : []
+  const deliverables = (rawDels as Record<string, unknown>[]).map((d) => ({
+    label: str(d['label']).slice(0, 60),
+    url: str(d['url']).slice(0, 512),
+  })).filter((d) => d.url)
+
+  if (!bountyId || !contributor || !title || !summary) {
+    res.status(400).json({ ok: false, error: 'bountyId, contributor, title, and summary are required.' })
+    return
+  }
+  if (contributor === bountyOwner) {
+    res.status(400).json({ ok: false, error: 'You cannot submit to your own bounty.' })
+    return
+  }
+  // No duplicate submissions
+  const existing = [...submissions.values()].find(
+    (s) => s.bountyId === bountyId && s.contributor === contributor
+  )
+  if (existing) {
+    res.status(400).json({ ok: false, error: 'You have already submitted work for this bounty.' })
+    return
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const sub: ServerSubmission = {
+    id: newId(), bountyId, bountyTitle, bountyOwner,
+    contributor, title, summary, deliverables,
+    status: 'pending', submittedAt: now, updatedAt: now,
+  }
+  submissions.set(sub.id, sub)
+
+  // Notify bounty owner
+  addNotification({
+    recipientAddress: bountyOwner,
+    type: 'new_submission',
+    title: 'New submission received',
+    message: `${contributor.slice(0, 8)}… submitted to "${bountyTitle || bountyId}"`,
+    bountyId,
+    submissionId: sub.id,
+  })
+
+  res.json({ ok: true, submission: sub })
+})
+
+// PATCH /api/submissions/:id — update status / creator note
+app.patch('/api/submissions/:id', (req: Request, res: ExpressResponse) => {
+  const paramId = req.params['id']
+  const sub = submissions.get(typeof paramId === 'string' ? paramId : '')
+  if (!sub) { res.status(404).json({ ok: false, error: 'Submission not found.' }); return }
+
+  const b = req.body as Record<string, unknown>
+  const callerAddress = typeof b['callerAddress'] === 'string' ? b['callerAddress'].toLowerCase() : ''
+  if (callerAddress !== sub.bountyOwner) {
+    res.status(403).json({ ok: false, error: 'Only the bounty owner can update submission status.' })
+    return
+  }
+
+  const newStatus = typeof b['status'] === 'string' ? b['status'] : sub.status
+  const creatorNote = typeof b['creatorNote'] === 'string' ? b['creatorNote'].slice(0, 500) : sub.creatorNote
+  sub.status = newStatus
+  sub.creatorNote = creatorNote
+  sub.updatedAt = Math.floor(Date.now() / 1000)
+
+  // Notify contributor
+  const statusLabel: Record<string, string> = {
+    under_review: 'Your submission is under review',
+    revision_requested: 'Revisions requested on your submission',
+    rejected: 'Your submission was not selected',
+    approved: 'Your submission was approved',
+    paid: 'Payment released for your submission',
+  }
+  addNotification({
+    recipientAddress: sub.contributor,
+    type: 'status_update',
+    title: statusLabel[newStatus] ?? 'Submission updated',
+    message: creatorNote ?? `Status changed to ${newStatus}`,
+    bountyId: sub.bountyId,
+    submissionId: sub.id,
+  })
+
+  res.json({ ok: true, submission: sub })
+})
+
+// GET /api/notifications?address=xxx — get notifications for an address
+app.get('/api/notifications', (req: Request, res: ExpressResponse) => {
+  const address = typeof req.query['address'] === 'string' ? req.query['address'].toLowerCase() : null
+  if (!address) { res.status(400).json({ ok: false, error: 'address is required.' }); return }
+  const result = notifications
+    .filter((n) => n.recipientAddress === address)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 50)
+  res.json({ ok: true, notifications: result })
+})
+
+// PATCH /api/notifications/read — mark notifications as read
+app.patch('/api/notifications/read', (req: Request, res: ExpressResponse) => {
+  const b = req.body as Record<string, unknown>
+  const address = typeof b['address'] === 'string' ? b['address'].toLowerCase() : ''
+  const ids: string[] = Array.isArray(b['ids']) ? b['ids'].filter((x): x is string => typeof x === 'string') : []
+  notifications.forEach((n) => {
+    if (n.recipientAddress === address && (ids.length === 0 || ids.includes(n.id))) {
+      n.read = true
+    }
+  })
+  res.json({ ok: true })
+})
+
 // ── Static frontend serving (production / Docker) ─────────────────────────────
 // Serves the Vite build output from dist/ and falls back to index.html
 // for all non-API routes so client-side routing works after page refresh.
