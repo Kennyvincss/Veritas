@@ -42,7 +42,7 @@ const SORT_OPTIONS: { id: SortOption; label: string }[] = [
 ]
 
 const STATUS_FILTERS = [
-  { id: 'all',       label: 'All Bounties' },
+  { id: 'all',       label: 'All Jobs' },
   { id: 'open',      label: 'Open' },
   { id: 'in_review', label: 'In Review' },
   { id: 'completed', label: 'Completed' },
@@ -234,7 +234,7 @@ function DetailPanel({
               display: 'block',
             }}
           >
-            Other bounties from this creator
+            Other jobs from this creator
           </a>
         )}
       </div>
@@ -265,7 +265,7 @@ export function MarketplacePage({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showSortMenu, setShowSortMenu] = useState(false)
 
-  // Memoize: bounty IDs that the connected user has submitted to
+  // Memoize: job IDs that the connected user has submitted to
   const mySubmittedBountyIds = useMemo(
     () =>
       new Set(
@@ -428,7 +428,7 @@ export function MarketplacePage({
             }}
           >
             <h1 className="display font-700 text-xl mb-0.5" style={{ color: 'var(--ink)', letterSpacing: '-0.03em' }}>
-              {isCreator ? 'Post a bounty, get it done.' : 'Find your ideal bounty right here!'}
+              {isCreator ? 'Post a job, get it done.' : 'Find your ideal job right here!'}
             </h1>
             <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
               {isCreator
@@ -524,7 +524,7 @@ export function MarketplacePage({
                 style={{ background: 'var(--ink)', color: '#fff' }}
               >
                 <Plus size={12} />
-                Post Bounty
+                Post Job
               </button>
             </div>
           </div>
@@ -562,13 +562,13 @@ export function MarketplacePage({
               className="flex flex-col items-center justify-center py-20 rounded-2xl border"
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
             >
-              <p className="display font-600 text-base mb-1" style={{ color: 'var(--ink)' }}>No bounties found</p>
+              <p className="display font-600 text-base mb-1" style={{ color: 'var(--ink)' }}>No jobs found</p>
               <p className="text-sm mb-5" style={{ color: 'var(--muted)' }}>
                 {query
                   ? 'Try a different search or filter.'
                   : isCreator
-                  ? 'No bounties yet. Be the first to post one.'
-                  : 'No bounties posted yet. Check back soon — new opportunities are added regularly.'}
+                  ? 'No jobs yet. Be the first to post one.'
+                  : 'No jobs posted yet. Check back soon — new opportunities are added regularly.'}
               </p>
               {!query && isCreator && (
                 <button

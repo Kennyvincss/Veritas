@@ -18,6 +18,9 @@ import { LeaderboardPage } from './components/LeaderboardPage'
 import { ReceiptVerifyPage } from './components/ReceiptVerifyPage'
 import { PostGigPage } from './components/PostGigPage'
 import { GigsMarketplace } from './components/GigsMarketplace'
+import { MessagesPage } from './components/MessagesPage'
+import { OrdersPage } from './components/OrdersPage'
+import { OrderGigModal } from './components/OrderGigModal'
 import { useOnchainBounties } from './hooks/useOnchainBounties'
 import { useServerSubmissions } from './hooks/useServerSubmissions'
 import { useArcNetwork } from './hooks/useArcNetwork'
@@ -26,6 +29,7 @@ import { useRole } from './hooks/useRole'
 import { AlertTriangle } from 'lucide-react'
 import { VeriPayLogo } from './components/VeriPayLogo'
 import type { Bounty } from './types/bounty'
+import type { Gig } from './types/gig'
 
 type View =
   | 'landing'
@@ -39,6 +43,8 @@ type View =
   | 'howitworks'
   | 'post_gig'
   | 'gigs'
+  | 'messages'
+  | 'orders'
 
 // Banner shown when wallet is on Arc Mainnet before the contract is deployed there,
 // or as a persistent reminder that the user is on a live network with real funds.
@@ -89,10 +95,10 @@ function NetworkBanner() {
 
 // View title map
 const VIEW_TITLES: Record<string, string> = {
-  marketplace: 'Bounty Marketplace',
-  create: 'Post a Bounty',
+  marketplace: 'Job Marketplace',
+  create: 'Post a Job',
   dashboard: 'Dashboard',
-  bounty_detail: 'Bounty Details',
+  bounty_detail: 'Job Details',
   profile: 'Profile',
   leaderboard: 'Leaderboard',
   receipt_verify: 'Receipt Verification',
@@ -160,16 +166,20 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
   // Lazy-initialize view from URL params so ?receipt= deep-links work immediately
   const [view, setView] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('receipt') ? 'receipt_verify' : 'landing'
+    if (params.get('receipt')) return 'receipt_verify'
+    if (params.get('gig')) return 'gigs'
+    return 'landing'
   })
   const [selectedBountyId, setSelectedBountyId] = useState<string | null>(null)
   const [profileAddress, setProfileAddress] = useState<string | null>(null)
+  const [messagePartner, setMessagePartner] = useState<string | undefined>(undefined)
+  const [orderingGig, setOrderingGig] = useState<Gig | null>(null)
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
     return params.get('receipt')
   })
 
-  const { isConnected } = usePrivyAccount()
+  const { isConnected, address } = usePrivyAccount()
   const {
     role,
     effectiveRole,
@@ -183,11 +193,23 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
   const submissionsApi = useServerSubmissions()
   const stats = usePlatformStats(bounties, submissionsApi.submissions)
 
+  function openMessages(partner?: string) {
+    setMessagePartner(partner)
+    setView('messages')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   function navigate(v: string, addr?: string) {
     // NavBar emits 'profile:<address>' as a shortcut
     if (v.startsWith('profile:')) {
       const navAddr = v.slice('profile:'.length)
       if (navAddr) openProfile(navAddr)
+      return
+    }
+    // 'messages:<address>' opens messages with a specific partner
+    if (v.startsWith('messages:')) {
+      const partner = v.slice('messages:'.length)
+      openMessages(partner || undefined)
       return
     }
     // 'howitworks' is not a separate page — go to landing and scroll to the section
@@ -242,8 +264,8 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
   useEffect(() => {
     const titles: Record<string, string> = {
       landing: 'VERIPAY — Onchain Bounty Platform',
-      marketplace: 'Bounty Marketplace — VERIPAY',
-      create: 'Post a Bounty — VERIPAY',
+      marketplace: 'Job Marketplace — VERIPAY',
+      create: 'Post a Job — VERIPAY',
       dashboard: 'Dashboard — VERIPAY',
       bounty_detail: selectedBounty ? `${selectedBounty.title} — VERIPAY` : 'Bounty — VERIPAY',
       profile: 'Profile — VERIPAY',
@@ -301,7 +323,7 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cta-hover)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--cta)')}
             >
-              Post Bounty
+              Post Job
             </button>
             <PrivyLoginButton variant="nav" />
           </nav>
@@ -321,7 +343,7 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
   // Inner views — top-bar layout (no sidebar offset; NavBar is now a top bar)
   const title = VIEW_TITLES[view] ?? 'VERIPAY'
   // Marketplace has its own full-height layout — hide the InnerHeader there
-  const showInnerHeader = view !== 'marketplace' && view !== 'gigs'
+  const showInnerHeader = view !== 'marketplace' && view !== 'gigs' && view !== 'messages' && view !== 'orders'
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg-gradient)' }}>
@@ -369,7 +391,11 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
             )}
 
             {view === 'gigs' && (
-              <GigsMarketplace onNavigate={navigate} />
+              <GigsMarketplace
+                onNavigate={navigate}
+                myAddress={address ?? undefined}
+                onOrderGig={(gig) => setOrderingGig(gig)}
+              />
             )}
 
             {view === 'dashboard' && (
@@ -405,7 +431,7 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
                   className="mt-4 px-4 py-2.5 rounded-xl text-sm font-600"
                   style={{ background: 'var(--accent)', color: '#fff' }}
                 >
-                  Back to Marketplace
+                  Back to Job Board
                 </button>
               </div>
             )}
@@ -430,9 +456,26 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
                   className="mt-4 px-4 py-2.5 rounded-xl text-sm font-600"
                   style={{ background: 'var(--accent)', color: '#fff' }}
                 >
-                  Back to Marketplace
+                  Back to Job Board
                 </button>
               </div>
+            )}
+
+            {view === 'messages' && (
+              <MessagesPage
+                myAddress={address ?? undefined}
+                initialPartner={messagePartner}
+                role={effectiveRole}
+                onNavigate={navigate}
+              />
+            )}
+
+            {view === 'orders' && (
+              <OrdersPage
+                myAddress={address ?? undefined}
+                role={effectiveRole}
+                onNavigate={navigate}
+              />
             )}
 
             {view === 'leaderboard' && (
@@ -466,6 +509,16 @@ export default function App({ privyReady: _privyReady }: { privyReady?: boolean 
             )}
         </main>
       </div>
+
+      {/* Order Gig Modal — rendered at root level so it overlays everything */}
+      {orderingGig && address && (
+        <OrderGigModal
+          gig={orderingGig}
+          creatorAddress={address}
+          onClose={() => setOrderingGig(null)}
+          onSuccess={() => { setOrderingGig(null); navigate('orders') }}
+        />
+      )}
     </div>
   )
 }

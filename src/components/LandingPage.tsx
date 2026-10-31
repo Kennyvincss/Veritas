@@ -197,11 +197,11 @@ const PROBLEMS = [
   {
     icon: Users,
     problem: 'Difficult to prove your track record',
-    solution: 'Earn a portable profile with verified completed bounties and peer reviews.',
+    solution: 'Earn a portable profile with verified completed jobs and peer reviews.',
   },
   {
     icon: AlertCircle,
-    problem: 'Opaque bounty reviews',
+    problem: 'Opaque job reviews',
     solution: 'AI evaluation compares submissions against acceptance criteria — transparent, traceable.',
   },
   {
@@ -296,7 +296,7 @@ function FeaturedBounties({
   const { getProfile } = useProfiles()
   const reviewsApi = useReviews()
 
-  // Show up to 6 open bounties, sorted by reward
+  // Show up to 6 open jobs, sorted by reward
   const featured = bounties
     .filter((b) => b.status === 'open')
     .sort((a, b) => Number(b.rewardRaw - a.rewardRaw))
@@ -343,14 +343,14 @@ function FeaturedBounties({
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
         >
           <Trophy size={32} className="mx-auto mb-3" style={{ color: 'var(--subtle)' }} />
-          <p className="font-600 mb-2" style={{ color: 'var(--ink)' }}>No open bounties yet</p>
-          <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Be the first to post a funded bounty.</p>
+          <p className="font-600 mb-2" style={{ color: 'var(--ink)' }}>No open jobs yet</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Be the first to post a funded job.</p>
           <button
             onClick={() => onNavigate('create')}
             className="px-4 py-2.5 rounded-xl text-sm font-600"
             style={{ background: 'var(--accent)', color: '#fff' }}
           >
-            Post a Bounty
+            Post a Job
           </button>
         </div>
       ) : (
@@ -603,7 +603,7 @@ function ProductPreview({ onNavigate }: { onNavigate: (view: string) => void }) 
           </h2>
           <p className="text-sm max-w-lg mx-auto" style={{ color: 'var(--muted)', lineHeight: 1.7 }}>
             Below are example cards showing what a completed verification and AI evaluation look like.
-            These are illustrative — real data appears once bounties are active.
+            These are illustrative — real data appears once jobs are active.
           </p>
         </div>
 
@@ -645,20 +645,20 @@ const HOW_IT_WORKS_STEPS = [
   {
     num: '01',
     role: 'Creator',
-    action: 'Create a bounty',
+    action: 'Create a job',
     detail: 'Define the task, set the USDC reward, write clear acceptance criteria, and fund the escrow. The reward is locked before any work begins.',
     icon: Plus,
     cta: 'create',
-    ctaLabel: 'Post a bounty',
+    ctaLabel: 'Post a job',
   },
   {
     num: '02',
     role: 'Contributor',
     action: 'Submit your work',
-    detail: 'Complete the task and submit your work with a description and deliverable links. Any wallet can contribute to open bounties.',
+    detail: 'Complete the task and submit your work with a description and deliverable links. Any wallet can contribute to open jobs.',
     icon: ExternalLink,
     cta: 'marketplace',
-    ctaLabel: 'Browse open bounties',
+    ctaLabel: 'Browse open jobs',
   },
   {
     num: '03',
@@ -702,7 +702,7 @@ function HowItWorks({ onNavigate }: { onNavigate: (view: string) => void }) {
             Four steps from task to proof
           </h2>
           <p className="text-sm max-w-xl mx-auto" style={{ color: 'var(--muted)' }}>
-            A trustless bounty lifecycle backed by the VeritasEscrow smart contract on Arc.
+            A trustless job lifecycle backed by the VeritasEscrow smart contract on Arc.
           </p>
         </div>
 
@@ -778,7 +778,7 @@ const WHY_FEATURES = [
     icon: Shield,
     title: 'Contract-enforced payments',
     description:
-      'Only the bounty creator can approve work. Only the approved contributor receives payment. The contract enforces both rules.',
+      'Only the job creator can approve work. Only the approved contributor receives payment. The contract enforces both rules.',
   },
   {
     icon: CheckCircle,
@@ -790,7 +790,7 @@ const WHY_FEATURES = [
     icon: Star,
     title: 'Contributor reputation',
     description:
-      'Completed bounty interactions generate verified reviews. Reputation is earned through actual work, not self-reported.',
+      'Completed job interactions generate verified reviews. Reputation is earned through actual work, not self-reported.',
   },
   {
     icon: Zap,
@@ -880,7 +880,7 @@ const TRUST_ROWS = [
     color: '#7c3aed',
     bg: 'rgba(124,58,237,0.09)',
     title: 'AI evaluation result',
-    what: 'Compares submission content against bounty acceptance criteria, criterion by criterion.',
+    what: 'Compares submission content against job acceptance criteria, criterion by criterion.',
     how: 'AI model reviews the criteria snapshot and submission text. Schema-validated before storage.',
     limitation: 'Advisory only. Cannot verify links, binary files, or deployed services. The creator must make the final decision — AI cannot approve payments or issue receipts.',
   },
@@ -889,7 +889,7 @@ const TRUST_ROWS = [
     color: 'var(--accent)',
     bg: 'var(--accent-soft)',
     title: 'Human review decision',
-    what: 'The bounty creator\'s own decision after reviewing the submission and AI results.',
+    what: 'The job creator\'s own decision after reviewing the submission and AI results.',
     how: 'Stored separately from AI recommendations. Creator records it explicitly — it is never auto-populated.',
     limitation: 'A human review decision is a creator\'s personal note. It does not automatically trigger any onchain action. The creator must use the approval flow separately.',
   },
@@ -968,7 +968,7 @@ const CORE_FEATURES = [
     iconBg: 'rgba(3,105,161,0.09)',
     title: 'Verifiable Work Receipts',
     description:
-      'When a bounty is paid, VERIPAY generates a tamper-detectable receipt linking the submission reference, payment transaction, and acceptance criteria. Anyone can verify the receipt\'s integrity or check the onchain payment independently.',
+      'When a job is paid, VERIPAY generates a tamper-detectable receipt linking the submission reference, payment transaction, and acceptance criteria. Anyone can verify the receipt\'s integrity or check the onchain payment independently.',
     tag: 'Implemented',
     tagColor: 'var(--success)',
     tagBg: 'var(--success-bg)',
@@ -994,7 +994,7 @@ const CORE_FEATURES = [
     iconBg: 'var(--success-bg)',
     title: 'Portable Reputation',
     description:
-      'Completed bounties and eligible peer reviews build a contributor profile that anyone can view. Reputation is earned through real interactions — not self-reported. Profile data is stored offchain and linked to your wallet address.',
+      'Completed jobs and eligible peer reviews build a contributor profile that anyone can view. Reputation is earned through real interactions — not self-reported. Profile data is stored offchain and linked to your wallet address.',
     tag: 'Implemented',
     tagColor: 'var(--success)',
     tagBg: 'var(--success-bg)',
@@ -1025,7 +1025,7 @@ const CORE_FEATURES = [
     tagColor: 'var(--success)',
     tagBg: 'var(--success-bg)',
     cta: 'create',
-    ctaLabel: 'Post a bounty',
+    ctaLabel: 'Post a job',
   },
   {
     icon: Hash,
@@ -1137,10 +1137,10 @@ function TopContributorsPreview({
   const byAddress = new Map<string, { address: string; paid: number; earned: bigint }>()
   for (const sub of submissions.filter((s) => s.status === 'paid')) {
     const addr = sub.contributor.toLowerCase()
-    const bounty = bounties.find((b) => b.id === sub.bountyId)
+    const job = bounties.find((b) => b.id === sub.bountyId)
     const entry = byAddress.get(addr) ?? { address: sub.contributor, paid: 0, earned: 0n }
     entry.paid++
-    if (bounty) entry.earned += bounty.rewardRaw
+    if (job) entry.earned += job.rewardRaw
     byAddress.set(addr, entry)
   }
 
@@ -1165,7 +1165,7 @@ function TopContributorsPreview({
               Top Contributors
             </h2>
             <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-              Ranked by completed bounties — real activity, no fabrication
+              Ranked by completed jobs — real activity, no fabrication
             </p>
           </div>
           <button
@@ -1251,8 +1251,8 @@ const FAQ_ITEMS = [
     a: 'Click "Get test USDC" in the Arc Studio sidebar to receive testnet USDC automatically. No real money required.',
   },
   {
-    q: 'What happens to my USDC when I create a bounty?',
-    a: 'Your USDC is locked in the VeritasEscrow smart contract when you fund a bounty. Only the escrow contract can release it — to the approved contributor on approval, or back to you on cancellation.',
+    q: 'What happens to my USDC when I create a job?',
+    a: 'Your USDC is locked in the VeritasEscrow smart contract when you fund a job. Only the escrow contract can release it — to the approved contributor on approval, or back to you on cancellation.',
   },
   {
     q: 'Can I submit to my own bounty?',
@@ -1263,12 +1263,12 @@ const FAQ_ITEMS = [
     a: 'After you approve a submission, you call "Release Payment" which triggers a USDC transfer from the escrow contract directly to the contributor\'s wallet. This is an onchain transaction verified on Arc.',
   },
   {
-    q: 'Can I cancel a bounty and get a refund?',
-    a: 'Yes. You can cancel a funded bounty using the "Cancel Bounty" button, which returns your USDC from escrow. Cancellation is not possible after payment has been released.',
+    q: 'Can I cancel a job and get a refund?',
+    a: 'Yes. You can cancel a funded job using the "Cancel Job" button, which returns your USDC from escrow. Cancellation is not possible after payment has been released.',
   },
   {
     q: 'How do ratings and reviews work?',
-    a: 'After a bounty is paid, the creator can review the contributor and the contributor can review the creator. One review per direction per bounty. Reviews are stored offchain but tied to verified completed-bounty interactions.',
+    a: 'After a job is paid, the creator can review the contributor and the contributor can review the creator. One review per direction per bounty. Reviews are stored offchain but tied to verified completed-bounty interactions.',
   },
   {
     q: 'Is this a mainnet deployment?',
@@ -1349,7 +1349,7 @@ function Footer({ onNavigate }: { onNavigate: (view: string) => void }) {
               </span>
             </div>
             <p className="text-xs max-w-xs" style={{ color: 'var(--subtle)' }}>
-              Onchain bounty platform on Arc Testnet. Every reward locked in escrow before work begins.
+              Onchain job platform on Arc Testnet. Every reward locked in escrow before work begins.
             </p>
           </div>
 
@@ -1357,7 +1357,7 @@ function Footer({ onNavigate }: { onNavigate: (view: string) => void }) {
           <div className="grid grid-cols-2 gap-x-12 gap-y-2">
             {[
               { label: 'Explore Bounties', view: 'marketplace' },
-              { label: 'Post a Bounty', view: 'create' },
+              { label: 'Post a Job', view: 'create' },
               { label: 'Dashboard', view: 'dashboard' },
               { label: 'Leaderboard', view: 'leaderboard' },
               { label: 'My Profile', view: 'dashboard' },

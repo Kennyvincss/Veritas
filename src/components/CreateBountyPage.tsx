@@ -31,7 +31,7 @@ function stepLabel(step: CreateFundStep): string {
   switch (step) {
     case 'approving': return 'Confirm USDC approval in your wallet…'
     case 'approve_pending': return 'Approval confirming on-chain…'
-    case 'creating': return 'Confirm bounty creation in your wallet…'
+    case 'creating': return 'Confirm job creation in your wallet…'
     case 'create_pending': return 'Bounty transaction confirming…'
     case 'funding': return 'Confirm escrow funding in your wallet…'
     case 'fund_pending': return 'Funding confirming on-chain…'
@@ -163,8 +163,8 @@ export function CreateBountyPage({ onNavigate, onBountyCreated }: CreateBountyPa
             Bounty Live
           </h2>
           <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-            Your bounty is funded and visible in the marketplace.
-            {state.bountyId != null && ` Bounty #${state.bountyId}`}
+            Your job is funded and visible in the marketplace.
+            {state.bountyId != null && ` Job #${state.bountyId}`}
           </p>
           {state.fundTxHash && (
             <a
@@ -289,7 +289,7 @@ export function CreateBountyPage({ onNavigate, onBountyCreated }: CreateBountyPa
             />
           )}
           <StepRow
-            label={`${needsApproval ? '2' : '1'}. Create bounty on-chain`}
+            label={`${needsApproval ? '2' : '1'}. Create job on-chain`}
             done={createStepDone}
             active={createStepActive}
           />
@@ -390,7 +390,7 @@ export function CreateBountyPage({ onNavigate, onBountyCreated }: CreateBountyPa
           className="display font-700 text-2xl mb-1"
           style={{ color: 'var(--ink)', letterSpacing: '-0.03em' }}
         >
-          Post a Bounty
+          Post a Job
         </h1>
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
           Describe the work, set a USDC reward, and fund the escrow.

@@ -4,10 +4,10 @@
  * Desktop: sticky dark top bar — logo left, nav links center, role badge + icons + wallet right.
  * Mobile: same bar collapsed; bottom tab bar for primary navigation.
  *
- * Creator nav:    Explore · Post Bounty · Dashboard · Leaderboard
+ * Creator nav:    Explore · Post Job · Dashboard · Leaderboard
  * Freelancer nav: Explore · Dashboard · Leaderboard   (+ Switch to Creator pill)
  */
-import { BarChart2, Home, PlusSquare, Trophy, User, ArrowLeftRight } from 'lucide-react'
+import { BarChart2, Home, PlusSquare, User, ArrowLeftRight, MessageSquare, ShoppingBag } from 'lucide-react'
 import { usePrivyAccount } from '@/hooks/usePrivyAccount'
 import { PrivyLoginButton } from './PrivyLoginButton'
 import { NotificationBell } from './NotificationBell'
@@ -41,30 +41,34 @@ export function NavBar({
   const NAV_LINKS = isCreator
     ? [
         { id: 'gigs', label: 'Browse Freelancers' },
-        { id: 'marketplace', label: 'Bounties' },
-        { id: 'create', label: 'Post Bounty' },
+        { id: 'marketplace', label: 'Jobs' },
+        { id: 'create', label: 'Post Job' },
+        { id: 'orders', label: 'Orders' },
+        { id: 'messages', label: 'Messages' },
         { id: 'dashboard', label: 'Dashboard' },
-        { id: 'leaderboard', label: 'Leaderboard' },
       ]
     : [
-        { id: 'marketplace', label: 'Find Bounties' },
+        { id: 'marketplace', label: 'Find Jobs' },
         { id: 'post_gig', label: 'Post a Gig' },
+        { id: 'orders', label: 'Orders' },
+        { id: 'messages', label: 'Messages' },
         { id: 'dashboard', label: 'My Work' },
-        { id: 'leaderboard', label: 'Leaderboard' },
       ]
 
   const MOBILE_ITEMS = isCreator
     ? [
         { id: 'gigs', label: 'Freelancers', icon: User },
         { id: 'create', label: 'Post', icon: PlusSquare },
+        { id: 'orders', label: 'Orders', icon: ShoppingBag },
+        { id: 'messages', label: 'Messages', icon: MessageSquare },
         { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
-        { id: 'leaderboard', label: 'Rankings', icon: Trophy },
       ]
     : [
-        { id: 'marketplace', label: 'Bounties', icon: Home },
+        { id: 'marketplace', label: 'Jobs', icon: Home },
         { id: 'post_gig', label: 'Post Gig', icon: PlusSquare },
+        { id: 'orders', label: 'Orders', icon: ShoppingBag },
+        { id: 'messages', label: 'Messages', icon: MessageSquare },
         { id: 'dashboard', label: 'My Work', icon: BarChart2 },
-        { id: 'leaderboard', label: 'Rankings', icon: Trophy },
       ]
 
   function handleProfileNav() {

@@ -43,7 +43,7 @@ export function DashboardPage({
           Your Dashboard
         </h1>
         <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
-          Connect your wallet to view your bounties and submissions.
+          Connect your wallet to view your jobs and submissions.
         </p>
         <PrivyLoginButton variant="light" />
       </div>
@@ -66,7 +66,7 @@ export function DashboardPage({
     .filter((b) => b.status === 'completed')
     .reduce((sum, b) => sum + b.rewardRaw, 0n)
 
-  // Freelancer: sum reward of bounties where this address was the approved contributor + paid
+  // Freelancer: sum reward of jobs where this address was the approved contributor + paid
   const totalEarned = mySubmissions
     .filter((s) => s.status === 'paid')
     .reduce((sum, s) => {
@@ -98,7 +98,7 @@ export function DashboardPage({
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--cta)')}
           >
             <Plus size={15} />
-            Post Bounty
+            Post Job
           </button>
         )}
       </div>
@@ -176,7 +176,7 @@ export function DashboardPage({
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
             >
               <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-                No bounties posted yet.
+                No jobs posted yet.
               </p>
               <button
                 onClick={() => onNavigate('create')}
@@ -259,7 +259,7 @@ export function DashboardPage({
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
             >
               <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-                No submissions yet. Browse open bounties and submit your work.
+                No submissions yet. Browse open jobs and submit your work.
               </p>
               <button
                 onClick={() => onNavigate('marketplace')}
@@ -270,17 +270,17 @@ export function DashboardPage({
                   background: 'var(--surface)',
                 }}
               >
-                Browse open bounties
+                Browse open jobs
               </button>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
               {mySubmissions.map((s) => {
-                const bounty = bounties.find((b) => b.id === s.bountyId)
+                const job = bounties.find((b) => b.id === s.bountyId)
                 return (
                   <button
                     key={s.id}
-                    onClick={() => bounty && onSelectBounty(bounty.id)}
+                    onClick={() => job && onSelectBounty(job.id)}
                     className="w-full text-left rounded-2xl p-4 border transition-colors"
                     style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
                     onMouseEnter={(e) =>
@@ -301,10 +301,10 @@ export function DashboardPage({
                       <SubmissionStatusBadge status={s.status} />
                     </div>
 
-                    {/* Bounty name */}
-                    {bounty && (
+                    {/* Job name */}
+                    {job && (
                       <p className="text-xs mb-2 truncate" style={{ color: 'var(--subtle)' }}>
-                        For: {bounty.title}
+                        For: {job.title}
                       </p>
                     )}
 
@@ -364,11 +364,11 @@ export function DashboardPage({
                           View payout
                         </a>
                       )}
-                      {bounty && (
+                      {job && (
                         <div className="flex items-center gap-1.5">
                           <TokenUSDC variant="branded" size={12} />
                           <span className="text-xs display font-700 tabular-nums" style={{ color: 'var(--accent)' }}>
-                            {formatUsdcAmount(bounty.rewardRaw, displayChainId)}
+                            {formatUsdcAmount(job.rewardRaw, displayChainId)}
                           </span>
                         </div>
                       )}

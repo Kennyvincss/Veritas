@@ -7,10 +7,10 @@
  *   - Confirmation dialog before approval: shows bounty, contributor, reward, action.
  *   - Per-step progress: Approving → Confirming → Releasing → Confirmed with tx links.
  *   - Submission updated to 'approved' after step 1, 'paid' after step 2.
- *   - Cancel Bounty button for owner on eligible (Funded/Approved) bounties.
+ *   - Cancel Job button for owner on eligible (Funded/Approved) bounties.
  *   - Sonner toasts for secondary notifications.
  *   - Duplicate-payout guard: Approve button hidden once a submission is approved/paid
- *     or once a different submission has been approved for this bounty.
+ *     or once a different submission has been approved for this job.
  *
  * Contract authorization is enforced by the contract — frontend gates are UX only.
  */
@@ -61,6 +61,7 @@ import { useApproveAndPay, useReleasePayment } from '@/hooks/useApproveAndPay'
 import { useCancelBounty } from '@/hooks/useCancelBounty'
 import { useReceipts } from '@/hooks/useReceipts'
 import { AIEvaluationPanel } from './AIEvaluationPanel'
+import { useApplications } from '@/hooks/useApplications'
 
 const MAX_TITLE_LEN = 150
 const MAX_SUMMARY_LEN = 4_000
@@ -130,13 +131,46 @@ export function BountyDetailPage({
   // ── cancel confirm dialog state ───────────────────────────────────────────
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
+  // ── application request state ────────────────────────────────────────────
+  const [appMessage, setAppMessage] = useState('')
+  const [appError, setAppError] = useState('')
+  const [appSubmitting, setAppSubmitting] = useState(false)
+  const [appSuccess, setAppSuccess] = useState(false)
+
+  const applicationsApi = useApplications({ jobId: bounty.id, applicantAddress: address ?? undefined })
+  const creatorApplicationsApi = useApplications({ jobId: bounty.id, jobOwner: bounty.owner })
+
   // ── onchain hooks ─────────────────────────────────────────────────────────
   const approveAndPay = useApproveAndPay()
-  const releasePayment = useReleasePayment()   // resume path: bounty already Approved
+  const releasePayment = useReleasePayment()   // resume path: job already Approved
   const cancelBounty = useCancelBounty()
   const receiptsApi = useReceipts()
 
   const isOwner = !!address && address.toLowerCase() === bounty.owner.toLowerCase()
+
+  // Application state for this freelancer
+  const myApplication = applicationsApi.applications.find(
+    (a) => a.applicantAddress === address?.toLowerCase()
+  )
+  const isApproved = myApplication?.status === 'approved'
+  const isPending = myApplication?.status === 'pending'
+  const isDeclined = myApplication?.status === 'declined'
+
+  async function handleApply() {
+    if (!address || !bounty.owner) return
+    setAppError('')
+    setAppSubmitting(true)
+    const result = await applicationsApi.apply({
+      jobId: bounty.id,
+      jobTitle: bounty.title,
+      jobOwner: bounty.owner,
+      applicantAddress: address,
+      message: appMessage.trim(),
+    })
+    setAppSubmitting(false)
+    if (result.ok) { setAppSuccess(true); setAppMessage('') }
+    else setAppError(result.error)
+  }
 
   // Stage 2: determine chain context for receipt issuance
   // Use the connected wallet's chainId if it's an Arc chain; fall back to Arc Testnet
@@ -152,15 +186,16 @@ export function BountyDetailPage({
   const isDraft = bounty.status === 'draft'
   const isLive = (bounty.status === 'open' || bounty.status === 'in_review') && !isExpired
   const alreadySubmitted = !!(address && submissionsApi.hasSubmitted(bounty.id, address))
-  const canSubmit = isConnected && !isOwner && isLive && !alreadySubmitted && !isDraft
+  // Freelancer must be approved by creator before they can submit work
+  const canSubmit = isConnected && !isOwner && isLive && !alreadySubmitted && !isDraft && isApproved
 
-  // True once any submission for this bounty is approved or paid
+  // True once any submission for this job is approved or paid
   const hasApprovedOrPaid = submissions.some(
     (s) => s.status === 'approved' || s.status === 'paid',
   )
 
   /**
-   * Resume payment path: the bounty is Approved onchain (approveContributor already confirmed)
+   * Resume payment path: the job is Approved onchain (approveContributor already confirmed)
    * but either the releasePayment tx was never sent or the tab was closed between the two steps.
    * Show a "Resume — Release Payment" button driven entirely from onchain state.
    */
@@ -172,7 +207,7 @@ export function BountyDetailPage({
     approveAndPay.state.step === 'idle' &&
     releasePayment.state.step === 'idle'
 
-  // Eligible for cancel: bounty is Funded or Approved onchain
+  // Eligible for cancel: job is Funded or Approved onchain
   const canCancel =
     isOwner &&
     (bounty.status === 'open' || bounty.status === 'in_review') &&
@@ -373,7 +408,7 @@ export function BountyDetailPage({
         onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
       >
         <ArrowLeft size={15} />
-        Back to marketplace
+        Back to job board
       </button>
 
       {/* ── Bounty header card ─────────────────────────────────────────────── */}
@@ -390,7 +425,7 @@ export function BountyDetailPage({
             style={{ color: 'var(--subtle)' }}
           >
             <Shield size={12} style={{ color: 'var(--success)' }} />
-            Bounty #{bounty.id} · Arc Testnet
+            Job #{bounty.id} · Arc Testnet
             <ExternalLink size={10} />
           </a>
           <BountyStatusBadge status={bounty.status} />
@@ -455,7 +490,7 @@ export function BountyDetailPage({
           </a>
         )}
 
-        {/* Cancel button — owner only, eligible bounties */}
+        {/* Cancel button — owner only, eligible jobs */}
         {isOwner && canCancel && (
           <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
             <button
@@ -466,7 +501,7 @@ export function BountyDetailPage({
               onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--danger-bg)')}
             >
               <Ban size={14} />
-              Cancel Bounty &amp; Refund
+              Cancel Job &amp; Refund
             </button>
             <p className="text-xs mt-2" style={{ color: 'var(--subtle)' }}>
               Cancels the escrow and returns the full reward to your wallet. Only available while not yet paid.
@@ -597,7 +632,7 @@ export function BountyDetailPage({
             Payment not yet released
           </p>
           <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
-            This bounty is in Approved state onchain — a contributor was chosen but the payment
+            This job is in Approved state onchain — a contributor was chosen but the payment
             release transaction was not completed. The approved contributor is{' '}
             <span className="mono">{bounty.approvedContributor}</span>.
           </p>
@@ -685,7 +720,7 @@ export function BountyDetailPage({
             style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
           >
             <p className="text-sm" style={{ color: 'var(--muted)' }}>
-              {isOwner ? 'No submissions yet.' : 'No submissions have been made for this bounty yet.'}
+              {isOwner ? 'No submissions yet.' : 'No submissions have been made for this job yet.'}
             </p>
           </div>
         ) : (
@@ -695,7 +730,7 @@ export function BountyDetailPage({
               .map((s) => {
                 const isExpanded = expandedSubmission === s.id
                 const isThisApproved = s.status === 'approved' || s.status === 'paid'
-                // Owner can approve only if: bounty eligible, no other approved, this sub not already approved
+                // Owner can approve only if: job eligible, no other approved, this sub not already approved
                 const canApproveThis = isOwner && isLive && !hasApprovedOrPaid && !isThisApproved && !approveAndPay.isPending
 
                 return (
@@ -873,6 +908,46 @@ export function BountyDetailPage({
         )}
       </section>
 
+      {/* ── Creator: pending applications panel ────────────────────────────── */}
+      {isOwner && creatorApplicationsApi.applications.filter((a) => a.status === 'pending').length > 0 && (
+        <section className="mb-8">
+          <h2 className="display font-600 text-base mb-4" style={{ color: 'var(--ink)', letterSpacing: '-0.02em' }}>
+            Work Requests ({creatorApplicationsApi.applications.filter((a) => a.status === 'pending').length})
+          </h2>
+          <div className="flex flex-col gap-3">
+            {creatorApplicationsApi.applications.filter((a) => a.status === 'pending').map((appl) => (
+              <div key={appl.id} className="rounded-2xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <p className="text-sm font-600 mono" style={{ color: 'var(--ink)' }}>{formatAddress(appl.applicantAddress)}</p>
+                    <p className="text-xs" style={{ color: 'var(--subtle)' }}>{appl.applicantAddress}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => { void creatorApplicationsApi.updateStatus(appl.id, 'approved', address ?? '') }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-600 border"
+                      style={{ background: 'var(--success-bg)', borderColor: 'rgba(26,122,69,0.3)', color: 'var(--success)' }}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => { void creatorApplicationsApi.updateStatus(appl.id, 'declined', address ?? '') }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-600 border"
+                      style={{ background: 'var(--danger-bg)', borderColor: 'rgba(192,54,77,0.22)', color: 'var(--danger)' }}
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </div>
+                {appl.message && (
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>{appl.message}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ── Submit work section ──────────────────────────────────────────────── */}
       {!isOwner && (
         <section>
@@ -892,7 +967,7 @@ export function BountyDetailPage({
               <div>
                 <p className="text-sm font-600" style={{ color: 'var(--success)' }}>Submission saved.</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                  Your work is stored locally and visible to the bounty owner. It will persist after refreshing.
+                  Your work is stored locally and visible to the job owner. It will persist after refreshing.
                 </p>
               </div>
             </div>
@@ -935,7 +1010,7 @@ export function BountyDetailPage({
                   : mySubmission.status === 'revision_requested'
                   ? 'The creator has requested revisions.'
                   : mySubmission.status === 'rejected'
-                  ? 'Your submission was not selected for this bounty.'
+                  ? 'Your submission was not selected for this job.'
                   : mySubmission.status === 'under_review'
                   ? 'The creator is reviewing your submission.'
                   : 'Your submission is awaiting review.'}
@@ -968,6 +1043,75 @@ export function BountyDetailPage({
             </div>
           )}
 
+          {/* Application request flow — shown before submission form */}
+          {isConnected && !alreadySubmitted && !isOwner && isLive && !isDraft && (
+            <div className="mb-6">
+              {/* Already approved */}
+              {isApproved && (
+                <div className="flex items-center gap-2 p-4 rounded-xl border mb-4"
+                  style={{ background: 'var(--success-bg)', borderColor: 'rgba(26,122,69,0.25)' }}>
+                  <CheckCircle2 size={16} style={{ color: 'var(--success)' }} />
+                  <p className="text-sm font-600" style={{ color: 'var(--success)' }}>
+                    Your request was approved. You can now submit your work below.
+                  </p>
+                </div>
+              )}
+              {/* Pending */}
+              {isPending && (
+                <div className="p-4 rounded-xl border" style={{ background: 'var(--accent-soft)', borderColor: 'var(--border)' }}>
+                  <p className="text-sm font-600 mb-1" style={{ color: 'var(--ink)' }}>Request pending</p>
+                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                    Your request to work on this job is awaiting the creator's approval.
+                  </p>
+                </div>
+              )}
+              {/* Declined */}
+              {isDeclined && (
+                <div className="p-4 rounded-xl border" style={{ background: 'var(--danger-bg)', borderColor: 'rgba(192,54,77,0.22)' }}>
+                  <p className="text-sm font-600 mb-1" style={{ color: 'var(--danger)' }}>Request declined</p>
+                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                    The creator has declined your request for this job.
+                  </p>
+                </div>
+              )}
+              {/* No application yet */}
+              {!myApplication && !appSuccess && (
+                <div className="rounded-2xl border p-5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <p className="display font-600 text-base mb-1" style={{ color: 'var(--ink)', letterSpacing: '-0.02em' }}>
+                    Request to work on this job
+                  </p>
+                  <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
+                    Send a request to the creator. Once approved, you can submit your work.
+                  </p>
+                  <textarea
+                    rows={3}
+                    placeholder="Tell the creator why you're the right fit for this job… (optional)"
+                    value={appMessage}
+                    onChange={(e) => { setAppMessage(e.target.value.slice(0, 1000)); setAppError('') }}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm border outline-none resize-none mb-3"
+                    style={{ background: 'var(--surface-muted)', borderColor: 'var(--border)', color: 'var(--ink)' }}
+                  />
+                  {appError && <p className="text-xs mb-2" style={{ color: 'var(--danger)' }}>{appError}</p>}
+                  <button
+                    onClick={() => { void handleApply() }}
+                    disabled={appSubmitting}
+                    className="w-full py-3 rounded-xl text-sm font-600 transition-colors min-h-[44px]"
+                    style={{ background: 'var(--cta)', color: '#fff', opacity: appSubmitting ? 0.6 : 1 }}
+                  >
+                    {appSubmitting ? 'Sending…' : 'Send Request'}
+                  </button>
+                </div>
+              )}
+              {appSuccess && !myApplication && (
+                <div className="flex items-center gap-2 p-4 rounded-xl border"
+                  style={{ background: 'var(--accent-soft)', borderColor: 'var(--border)' }}>
+                  <CheckCircle2 size={16} style={{ color: 'var(--success)' }} />
+                  <p className="text-sm" style={{ color: 'var(--ink)' }}>Request sent! Waiting for the creator to approve.</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {!alreadySubmitted && !isConnected && (
             <div
               className="flex items-center justify-between p-5 rounded-2xl border"
@@ -985,10 +1129,10 @@ export function BountyDetailPage({
             >
               <p className="text-sm" style={{ color: 'var(--muted)' }}>
                 {isDraft
-                  ? 'This bounty has not yet been funded. It is not accepting submissions until the owner deposits USDC into escrow.'
+                  ? 'This job has not yet been funded. It is not accepting submissions until the owner deposits USDC into escrow.'
                   : isExpired
-                  ? 'This bounty has expired and is no longer accepting submissions.'
-                  : 'This bounty is no longer accepting submissions.'}
+                  ? 'This job has expired and is no longer accepting submissions.'
+                  : 'This job is no longer accepting submissions.'}
               </p>
             </div>
           )}
@@ -1175,7 +1319,7 @@ export function BountyDetailPage({
                   Review &amp; Submit
                 </button>
                 <p className="text-xs text-center mt-2" style={{ color: 'var(--subtle)' }}>
-                  Submissions are stored locally and reviewed by the bounty owner. Payment is released onchain upon approval.
+                  Submissions are stored locally and reviewed by the job owner. Payment is released onchain upon approval.
                 </p>
               </div>
             </form>
@@ -1282,7 +1426,7 @@ export function BountyDetailPage({
             <div className="flex items-center gap-2 mb-2">
               <XCircle size={18} style={{ color: 'var(--danger)' }} />
               <h2 className="display font-700 text-lg" style={{ color: 'var(--ink)', letterSpacing: '-0.03em' }}>
-                Cancel Bounty
+                Cancel Job
               </h2>
             </div>
             <p className="text-sm mb-5" style={{ color: 'var(--muted)' }}>

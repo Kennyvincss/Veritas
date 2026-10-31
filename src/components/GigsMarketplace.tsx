@@ -4,7 +4,7 @@
  */
 
 import { useState, useMemo } from 'react'
-import { Search, Briefcase, Star, Clock, ExternalLink, Tag } from 'lucide-react'
+import { Search, Briefcase, Star, Clock, ExternalLink, Tag, Share2, Check } from 'lucide-react'
 import { useGigs } from '@/hooks/useGigs'
 import { useProfiles } from '@/hooks/useProfiles'
 import { formatAddress } from '@/lib/utils'
@@ -23,14 +23,26 @@ const CATEGORIES: { id: GigCategory | 'all'; label: string; emoji: string }[] = 
 
 interface GigCardProps {
   gig: Gig
+  myAddress?: string
   onNavigate: (view: string) => void
+  onOrderDirectly?: (gig: Gig) => void
 }
 
-function GigCard({ gig, onNavigate }: GigCardProps) {
+function GigCard({ gig, myAddress, onNavigate, onOrderDirectly }: GigCardProps) {
   const { getProfile } = useProfiles()
   const profile = getProfile(gig.freelancerAddress)
   const displayName = profile?.displayName || formatAddress(gig.freelancerAddress)
   const catEmoji = CATEGORIES.find((c) => c.id === gig.category)?.emoji ?? '⚡'
+  const [copied, setCopied] = useState(false)
+
+  function handleShare() {
+    const base = window.location.origin + window.location.pathname
+    const url = `${base}?gig=${gig.id}`
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   return (
     <div
@@ -125,25 +137,54 @@ function GigCard({ gig, onNavigate }: GigCardProps) {
         </div>
       )}
 
-      {/* Hire button: navigates to Post Bounty pre-filled */}
-      <button
-        onClick={() => onNavigate('create')}
-        className="w-full py-2.5 rounded-xl text-sm font-600 transition-colors"
-        style={{ background: 'var(--cta)', color: '#fff' }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cta-hover)')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--cta)')}
-      >
-        Post a Bounty to Hire
-      </button>
+      {/* Hire button: navigates to Post Job pre-filled */}
+      <div className="flex gap-2">
+        {/* Primary: Order Directly — shown when viewer is a creator (not the freelancer) */}
+        {onOrderDirectly && myAddress?.toLowerCase() !== gig.freelancerAddress.toLowerCase() ? (
+          <button
+            onClick={() => onOrderDirectly(gig)}
+            className="flex-1 py-2.5 rounded-xl text-sm font-600 transition-colors"
+            style={{ background: 'var(--cta)', color: '#fff' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cta-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--cta)')}
+          >
+            Order Directly
+          </button>
+        ) : (
+          <button
+            onClick={() => onNavigate('create')}
+            className="flex-1 py-2.5 rounded-xl text-sm font-600 transition-colors"
+            style={{ background: 'var(--cta)', color: '#fff' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cta-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--cta)')}
+          >
+            Post a Job to Hire
+          </button>
+        )}
+        <button
+          onClick={handleShare}
+          title="Copy share link"
+          className="flex items-center justify-center w-10 h-10 rounded-xl border shrink-0 transition-colors"
+          style={{
+            background: copied ? 'var(--success-bg)' : 'var(--surface-muted)',
+            borderColor: copied ? 'rgba(26,122,69,0.3)' : 'var(--border)',
+            color: copied ? 'var(--success)' : 'var(--subtle)',
+          }}
+        >
+          {copied ? <Check size={14} /> : <Share2 size={14} />}
+        </button>
+      </div>
     </div>
   )
 }
 
 interface GigsMarketplaceProps {
   onNavigate: (view: string) => void
+  myAddress?: string
+  onOrderGig?: (gig: Gig) => void
 }
 
-export function GigsMarketplace({ onNavigate }: GigsMarketplaceProps) {
+export function GigsMarketplace({ onNavigate, myAddress, onOrderGig }: GigsMarketplaceProps) {
   const { gigs } = useGigs()
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<GigCategory | 'all'>('all')
@@ -168,7 +209,7 @@ export function GigsMarketplace({ onNavigate }: GigsMarketplaceProps) {
           Browse Freelancers
         </h1>
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
-          Find skilled freelancers, post a bounty to hire them, and pay in USDC via escrow.
+          Find skilled freelancers, post a job to hire them, and pay in USDC via escrow.
         </p>
       </div>
 
@@ -227,14 +268,14 @@ export function GigsMarketplace({ onNavigate }: GigsMarketplaceProps) {
             No freelancers yet
           </h2>
           <p className="text-sm max-w-sm mx-auto mb-6" style={{ color: 'var(--muted)' }}>
-            Freelancers haven't posted any gigs yet. Check back soon — or post a bounty and let talent come to you.
+            Freelancers haven't posted any gigs yet. Check back soon — or post a job and let talent come to you.
           </p>
           <button
             onClick={() => onNavigate('create')}
             className="px-5 py-2.5 rounded-xl text-sm font-600"
             style={{ background: 'var(--cta)', color: '#fff' }}
           >
-            Post a Bounty
+            Post a Job
           </button>
         </div>
       )}
@@ -252,7 +293,7 @@ export function GigsMarketplace({ onNavigate }: GigsMarketplaceProps) {
       {filtered.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((gig) => (
-            <GigCard key={gig.id} gig={gig} onNavigate={onNavigate} />
+            <GigCard key={gig.id} gig={gig} myAddress={myAddress} onNavigate={onNavigate} onOrderDirectly={onOrderGig} />
           ))}
         </div>
       )}

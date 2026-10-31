@@ -584,10 +584,10 @@ const submissions = new Map<string, ServerSubmission>()
 interface ServerNotification {
   id: string
   recipientAddress: string   // lowercase
-  type: 'new_submission' | 'status_update' | 'payment_released' | 'bounty_cancelled'
+  type: 'new_submission' | 'status_update' | 'payment_released' | 'bounty_cancelled' | 'job_application' | 'application_update' | 'message'
   title: string
   message: string
-  bountyId: string
+  bountyId?: string
   submissionId?: string
   createdAt: number
   read: boolean
@@ -729,6 +729,396 @@ app.patch('/api/notifications/read', (req: Request, res: ExpressResponse) => {
     }
   })
   res.json({ ok: true })
+})
+
+// ── Job Application Requests ──────────────────────────────────────────────────
+// Freelancer requests to work on a job; creator approves/declines.
+
+interface JobApplication {
+  id: string
+  jobId: string
+  jobTitle: string
+  jobOwner: string          // creator address
+  applicantAddress: string  // freelancer address
+  message: string           // why they want the job
+  status: 'pending' | 'approved' | 'declined'
+  createdAt: number
+  updatedAt: number
+}
+
+const applications = new Map<string, JobApplication>()
+
+// genId removed — use newId() instead
+function _unused_() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+// POST /api/applications — freelancer applies for a job
+app.post('/api/applications', (req: Request, res: ExpressResponse) => {
+  const b = (req.body ?? {}) as Record<string, unknown>
+  const str = (v: unknown) => typeof v === 'string' ? v.trim() : ''
+  const jobId = str(b['jobId'])
+  const jobTitle = str(b['jobTitle']).slice(0, 200)
+  const jobOwner = str(b['jobOwner']).toLowerCase()
+  const applicantAddress = str(b['applicantAddress']).toLowerCase()
+  const message = str(b['message']).slice(0, 1000)
+
+  if (!jobId || !jobOwner || !applicantAddress) {
+    res.status(400).json({ ok: false, error: 'jobId, jobOwner, applicantAddress are required.' }); return
+  }
+  if (applicantAddress === jobOwner) {
+    res.status(400).json({ ok: false, error: 'Cannot apply to your own job.' }); return
+  }
+  // One application per job per applicant
+  const existing = [...applications.values()].find(
+    (a) => a.jobId === jobId && a.applicantAddress === applicantAddress
+  )
+  if (existing) {
+    res.status(409).json({ ok: false, error: 'You have already applied for this job.' }); return
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const app_: JobApplication = {
+    id: newId(), jobId, jobTitle, jobOwner, applicantAddress, message,
+    status: 'pending', createdAt: now, updatedAt: now,
+  }
+  applications.set(app_.id, app_)
+
+  // Notify creator
+  const notifId = newId()
+  notifications.push({
+    id: notifId,
+    recipientAddress: jobOwner,
+    type: 'job_application',
+    title: 'New job application',
+    message: `Someone wants to work on "${jobTitle}"`,
+    bountyId: jobId,
+    read: false,
+    createdAt: now,
+  })
+
+  res.json({ ok: true, application: app_ })
+})
+
+// GET /api/applications?jobId=&applicantAddress=&jobOwner= — query applications
+app.get('/api/applications', (req: Request, res: ExpressResponse) => {
+  const jobId = typeof req.query['jobId'] === 'string' ? req.query['jobId'] : undefined
+  const applicantAddress = typeof req.query['applicantAddress'] === 'string' ? req.query['applicantAddress'].toLowerCase() : undefined
+  const jobOwner = typeof req.query['jobOwner'] === 'string' ? req.query['jobOwner'].toLowerCase() : undefined
+
+  let result = [...applications.values()]
+  if (jobId) result = result.filter((a) => a.jobId === jobId)
+  if (applicantAddress) result = result.filter((a) => a.applicantAddress === applicantAddress)
+  if (jobOwner) result = result.filter((a) => a.jobOwner === jobOwner)
+  res.json({ ok: true, applications: result })
+})
+
+// PATCH /api/applications/:id — creator approves/declines
+app.patch('/api/applications/:id', (req: Request, res: ExpressResponse) => {
+  const paramId = req.params['id']
+  const appl = applications.get(typeof paramId === 'string' ? paramId : '')
+  if (!appl) { res.status(404).json({ ok: false, error: 'Application not found.' }); return }
+
+  const b = (req.body ?? {}) as Record<string, unknown>
+  const callerAddress = (typeof b['callerAddress'] === 'string' ? b['callerAddress'] : '').toLowerCase()
+  const status = typeof b['status'] === 'string' ? b['status'] : ''
+
+  if (callerAddress !== appl.jobOwner) {
+    res.status(403).json({ ok: false, error: 'Only the job owner can update this application.' }); return
+  }
+  if (status !== 'approved' && status !== 'declined') {
+    res.status(400).json({ ok: false, error: 'status must be approved or declined.' }); return
+  }
+
+  appl.status = status as 'approved' | 'declined'
+  appl.updatedAt = Math.floor(Date.now() / 1000)
+
+  // Notify applicant
+  const now = Math.floor(Date.now() / 1000)
+  notifications.push({
+    id: newId(),
+    recipientAddress: appl.applicantAddress,
+    type: 'application_update',
+    title: status === 'approved' ? 'Application approved!' : 'Application declined',
+    message: status === 'approved'
+      ? `You have been approved to work on "${appl.jobTitle}"`
+      : `Your application for "${appl.jobTitle}" was declined`,
+    bountyId: appl.jobId,
+    read: false,
+    createdAt: now,
+  })
+
+  res.json({ ok: true, application: appl })
+})
+
+// ── Messaging ─────────────────────────────────────────────────────────────────
+// Simple direct messages between two wallet addresses.
+
+interface Message {
+  id: string
+  fromAddress: string
+  toAddress: string
+  text: string
+  createdAt: number
+  read: boolean
+}
+
+const messages: Message[] = []
+
+// Conversation key: sorted addresses joined by '|'
+function convKey(a: string, b: string): string {
+  return [a.toLowerCase(), b.toLowerCase()].sort().join('|')
+}
+
+// POST /api/messages — send a message
+app.post('/api/messages', (req: Request, res: ExpressResponse) => {
+  const b = (req.body ?? {}) as Record<string, unknown>
+  const str = (v: unknown) => typeof v === 'string' ? v.trim() : ''
+  const fromAddress = str(b['fromAddress']).toLowerCase()
+  const toAddress = str(b['toAddress']).toLowerCase()
+  const text = str(b['text']).slice(0, 2000)
+
+  if (!fromAddress || !toAddress || !text) {
+    res.status(400).json({ ok: false, error: 'fromAddress, toAddress, text are required.' }); return
+  }
+  if (fromAddress === toAddress) {
+    res.status(400).json({ ok: false, error: 'Cannot message yourself.' }); return
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const msg: Message = { id: newId(), fromAddress, toAddress, text, createdAt: now, read: false }
+  messages.push(msg)
+
+  // Notify recipient
+  notifications.push({
+    id: newId(),
+    recipientAddress: toAddress,
+    type: 'message',
+    title: 'New message',
+    message: `${fromAddress.slice(0, 6)}...${fromAddress.slice(-4)}: ${text.slice(0, 60)}`,
+    bountyId: undefined,
+    read: false,
+    createdAt: now,
+  })
+
+  res.json({ ok: true, message: msg })
+})
+
+// GET /api/messages?between=addr1,addr2 — get conversation
+app.get('/api/messages', (req: Request, res: ExpressResponse) => {
+  const between = typeof req.query['between'] === 'string' ? req.query['between'] : ''
+  const myAddress = typeof req.query['myAddress'] === 'string' ? req.query['myAddress'].toLowerCase() : ''
+
+  if (between) {
+    const [a, b_] = between.split(',').map((s) => s.trim().toLowerCase())
+    if (!a || !b_) { res.status(400).json({ ok: false, error: 'between must be addr1,addr2' }); return }
+    const key = convKey(a, b_)
+    const conv = messages.filter((m) => convKey(m.fromAddress, m.toAddress) === key)
+    res.json({ ok: true, messages: conv })
+    return
+  }
+
+  if (myAddress) {
+    // Return all unique conversation partners + last message
+    const partners = new Map<string, Message>()
+    for (const m of messages) {
+      if (m.fromAddress !== myAddress && m.toAddress !== myAddress) continue
+      const partner = m.fromAddress === myAddress ? m.toAddress : m.fromAddress
+      const existing = partners.get(partner)
+      if (!existing || m.createdAt > existing.createdAt) partners.set(partner, m)
+    }
+    const unreadCounts = new Map<string, number>()
+    for (const m of messages) {
+      if (m.toAddress === myAddress && !m.read) {
+        const partner = m.fromAddress
+        unreadCounts.set(partner, (unreadCounts.get(partner) ?? 0) + 1)
+      }
+    }
+    const conversations = [...partners.entries()].map(([partner, lastMsg]) => ({
+      partnerAddress: partner,
+      lastMessage: lastMsg,
+      unreadCount: unreadCounts.get(partner) ?? 0,
+    }))
+    res.json({ ok: true, conversations })
+    return
+  }
+
+  res.status(400).json({ ok: false, error: 'Provide between or myAddress.' })
+})
+
+// POST /api/messages/read — mark messages as read
+app.post('/api/messages/read', (req: Request, res: ExpressResponse) => {
+  const b = (req.body ?? {}) as Record<string, unknown>
+  const myAddress = (typeof b['myAddress'] === 'string' ? b['myAddress'] : '').toLowerCase()
+  const partnerAddress = (typeof b['partnerAddress'] === 'string' ? b['partnerAddress'] : '').toLowerCase()
+  if (!myAddress || !partnerAddress) { res.status(400).json({ ok: false, error: 'myAddress and partnerAddress required.' }); return }
+  messages.forEach((m) => {
+    if (m.toAddress === myAddress && m.fromAddress === partnerAddress) m.read = true
+  })
+  res.json({ ok: true })
+})
+
+// ── Orders ───────────────────────────────────────────────────────────────────
+
+interface ServerOrder {
+  id: string
+  gigId?: string
+  gigTitle: string
+  creatorAddress: string
+  freelancerAddress: string
+  description: string
+  price: number
+  deliveryDays: number
+  status: 'pending_acceptance' | 'active' | 'delivered' | 'completed' | 'cancelled' | 'disputed'
+  offerOrigin: 'creator' | 'freelancer'
+  startedAt?: number
+  deadlineAt?: number
+  deliveredAt?: number
+  completedAt?: number
+  createdAt: number
+  updatedAt: number
+  creatorNote?: string
+  freelancerNote?: string
+}
+
+const orders = new Map<string, ServerOrder>()
+
+// POST /api/orders — place a new order or custom offer
+app.post('/api/orders', (req: Request, res: ExpressResponse) => {
+  const b = req.body as Record<string, unknown>
+  const str = (v: unknown, fb = '') => typeof v === 'string' ? v.trim() : fb
+  const num = (v: unknown, fb = 0) => typeof v === 'number' ? v : fb
+
+  const gigId = str(b['gigId']) || undefined
+  const gigTitle = str(b['gigTitle'])
+  const creatorAddress = str(b['creatorAddress']).toLowerCase()
+  const freelancerAddress = str(b['freelancerAddress']).toLowerCase()
+  const description = str(b['description']).slice(0, 2000)
+  const price = num(b['price'])
+  const deliveryDays = Math.max(1, Math.min(365, num(b['deliveryDays'], 7)))
+  const offerOrigin = str(b['offerOrigin']) as 'creator' | 'freelancer'
+  const autoStart = b['autoStart'] === true // creator direct order: start immediately
+
+  if (!gigTitle || !creatorAddress || !freelancerAddress || !description || price <= 0) {
+    res.status(400).json({ ok: false, error: 'Missing required fields.' }); return
+  }
+  if (!['creator', 'freelancer'].includes(offerOrigin)) {
+    res.status(400).json({ ok: false, error: 'offerOrigin must be creator or freelancer.' }); return
+  }
+
+  const now = Date.now()
+  const id = newId()
+  const startedAt = autoStart ? now : undefined
+  const deadlineAt = autoStart ? now + deliveryDays * 86400 * 1000 : undefined
+
+  const order: ServerOrder = {
+    id, gigId, gigTitle, creatorAddress, freelancerAddress,
+    description, price, deliveryDays,
+    status: autoStart ? 'active' : 'pending_acceptance',
+    offerOrigin,
+    startedAt, deadlineAt,
+    createdAt: now, updatedAt: now,
+  }
+  orders.set(id, order)
+
+  // Notify recipient
+  const recipientAddress = offerOrigin === 'creator' ? freelancerAddress : creatorAddress
+  const notifTitle = offerOrigin === 'creator' ? 'New order received' : 'Custom offer received'
+  const notifMsg = offerOrigin === 'creator'
+    ? `${creatorAddress.slice(0, 6)}… ordered "${gigTitle}"`
+    : `${freelancerAddress.slice(0, 6)}… sent you a custom offer for "${gigTitle}"`
+  notifications.push({
+    id: newId(), recipientAddress, type: 'job_application',
+    title: notifTitle, message: notifMsg,
+    bountyId: gigId, createdAt: now, read: false,
+  })
+
+  res.json({ ok: true, order })
+})
+
+// GET /api/orders — list orders for a user
+app.get('/api/orders', (req: Request, res: ExpressResponse) => {
+  const addr = (typeof req.query['address'] === 'string' ? req.query['address'] : '').toLowerCase()
+  if (!addr) { res.status(400).json({ ok: false, error: 'address required.' }); return }
+  const result = [...orders.values()].filter(
+    (o) => o.creatorAddress === addr || o.freelancerAddress === addr
+  ).sort((a, b) => b.createdAt - a.createdAt)
+  res.json({ ok: true, orders: result })
+})
+
+// PATCH /api/orders/:id — accept, decline, deliver, complete, cancel
+app.patch('/api/orders/:id', (req: Request, res: ExpressResponse) => {
+  const paramId = req.params['id']
+  const order = orders.get(typeof paramId === 'string' ? paramId : '')
+  if (!order) { res.status(404).json({ ok: false, error: 'Order not found.' }); return }
+
+  const b = req.body as Record<string, unknown>
+  const action = typeof b['action'] === 'string' ? b['action'] : ''
+  const callerAddress = (typeof b['callerAddress'] === 'string' ? b['callerAddress'] : '').toLowerCase()
+  const note = typeof b['note'] === 'string' ? b['note'].slice(0, 500) : undefined
+
+  const now = Date.now()
+
+  if (action === 'accept') {
+    // Only the recipient of the offer can accept
+    const expected = order.offerOrigin === 'creator' ? order.freelancerAddress : order.creatorAddress
+    if (callerAddress !== expected) { res.status(403).json({ ok: false, error: 'Not authorised to accept.' }); return }
+    if (order.status !== 'pending_acceptance') { res.status(400).json({ ok: false, error: 'Order is not pending acceptance.' }); return }
+    order.status = 'active'
+    order.startedAt = now
+    order.deadlineAt = now + order.deliveryDays * 86400 * 1000
+    order.updatedAt = now
+    // Notify offerer
+    const notifRecipient = order.offerOrigin === 'creator' ? order.creatorAddress : order.freelancerAddress
+    notifications.push({
+      id: newId(), recipientAddress: notifRecipient, type: 'application_update',
+      title: 'Order accepted!', message: `"${order.gigTitle}" order was accepted. Timer started.`,
+      bountyId: order.gigId, createdAt: now, read: false,
+    })
+  } else if (action === 'decline') {
+    const expected = order.offerOrigin === 'creator' ? order.freelancerAddress : order.creatorAddress
+    if (callerAddress !== expected) { res.status(403).json({ ok: false, error: 'Not authorised.' }); return }
+    if (order.status !== 'pending_acceptance') { res.status(400).json({ ok: false, error: 'Order is not pending.' }); return }
+    order.status = 'cancelled'
+    order.updatedAt = now
+  } else if (action === 'deliver') {
+    if (callerAddress !== order.freelancerAddress) { res.status(403).json({ ok: false, error: 'Only freelancer can deliver.' }); return }
+    if (order.status !== 'active') { res.status(400).json({ ok: false, error: 'Order is not active.' }); return }
+    order.status = 'delivered'
+    order.deliveredAt = now
+    order.updatedAt = now
+    if (note) order.freelancerNote = note
+    notifications.push({
+      id: newId(), recipientAddress: order.creatorAddress, type: 'status_update',
+      title: 'Order delivered!', message: `"${order.gigTitle}" has been delivered. Please review and confirm.`,
+      bountyId: order.gigId, createdAt: now, read: false,
+    })
+  } else if (action === 'complete') {
+    if (callerAddress !== order.creatorAddress) { res.status(403).json({ ok: false, error: 'Only creator can confirm completion.' }); return }
+    if (order.status !== 'delivered') { res.status(400).json({ ok: false, error: 'Order not yet delivered.' }); return }
+    order.status = 'completed'
+    order.completedAt = now
+    order.updatedAt = now
+    if (note) order.creatorNote = note
+    notifications.push({
+      id: newId(), recipientAddress: order.freelancerAddress, type: 'payment_released',
+      title: 'Order completed!', message: `"${order.gigTitle}" marked complete by the creator.`,
+      bountyId: order.gigId, createdAt: now, read: false,
+    })
+  } else if (action === 'cancel') {
+    if (callerAddress !== order.creatorAddress && callerAddress !== order.freelancerAddress) {
+      res.status(403).json({ ok: false, error: 'Not authorised.' }); return
+    }
+    if (!['pending_acceptance', 'active'].includes(order.status)) {
+      res.status(400).json({ ok: false, error: 'Cannot cancel at this stage.' }); return
+    }
+    order.status = 'cancelled'
+    order.updatedAt = now
+  } else {
+    res.status(400).json({ ok: false, error: `Unknown action: ${action}` }); return
+  }
+
+  res.json({ ok: true, order })
 })
 
 // ── Static frontend serving (production / Docker) ─────────────────────────────
