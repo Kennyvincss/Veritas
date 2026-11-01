@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Order } from '@/types/order'
 
-const AI_BASE = import.meta.env.VITE_AI_SERVER_URL as string | undefined
-function apiBase() { return AI_BASE ? AI_BASE.replace(/\/$/, '') : '' }
-
 export function useOrders(address: string | undefined) {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
@@ -12,7 +9,7 @@ export function useOrders(address: string | undefined) {
   const fetchOrders = useCallback(async () => {
     if (!address) return
     try {
-      const res = await fetch(`${apiBase()}/api/orders?address=${encodeURIComponent(address)}`)
+      const res = await fetch(`/api/orders?address=${encodeURIComponent(address)}`)
       if (!res.ok) return
       const data = await res.json() as { ok: boolean; orders: Order[] }
       if (data.ok) setOrders(data.orders)
@@ -39,7 +36,7 @@ export function useOrders(address: string | undefined) {
   }): Promise<{ ok: true; order: Order } | { ok: false; error: string }> => {
     setLoading(true)
     try {
-      const res = await fetch(`${apiBase()}/api/orders`, {
+      const res = await fetch(`/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -61,7 +58,7 @@ export function useOrders(address: string | undefined) {
     note?: string,
   ): Promise<{ ok: true; order: Order } | { ok: false; error: string }> => {
     try {
-      const res = await fetch(`${apiBase()}/api/orders/${orderId}`, {
+      const res = await fetch(`/api/orders?id=${encodeURIComponent(orderId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, callerAddress, note }),

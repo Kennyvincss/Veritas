@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const AI_BASE = import.meta.env.VITE_AI_SERVER_URL as string | undefined
-
-function apiBase(): string {
-  return AI_BASE ? AI_BASE.replace(/\/$/, '') : ''
-}
-
 export interface ChatMessage {
   id: string
   fromAddress: string
@@ -28,7 +22,7 @@ export function useMessages(myAddress: string | undefined) {
   const fetchConversations = useCallback(async () => {
     if (!myAddress) return
     try {
-      const res = await fetch(`${apiBase()}/api/messages?myAddress=${encodeURIComponent(myAddress)}`)
+      const res = await fetch(`/api/messages?myAddress=${encodeURIComponent(myAddress)}`)
       if (!res.ok) return
       const data = await res.json() as { ok: boolean; conversations: Conversation[] }
       if (data.ok) setConversations(data.conversations)
@@ -52,7 +46,7 @@ export function useConversation(myAddress: string | undefined, partnerAddress: s
   const fetchMsgs = useCallback(async () => {
     if (!myAddress || !partnerAddress) return
     try {
-      const res = await fetch(`${apiBase()}/api/messages?between=${encodeURIComponent(myAddress)},${encodeURIComponent(partnerAddress)}`)
+      const res = await fetch(`/api/messages?between=${encodeURIComponent(myAddress)},${encodeURIComponent(partnerAddress)}`)
       if (!res.ok) return
       const data = await res.json() as { ok: boolean; messages: ChatMessage[] }
       if (data.ok) setMsgs(data.messages)
@@ -69,21 +63,27 @@ export function useConversation(myAddress: string | undefined, partnerAddress: s
   const send = useCallback(async (text: string): Promise<boolean> => {
     if (!myAddress || !partnerAddress || !text.trim()) return false
     try {
-      const res = await fetch(`${apiBase()}/api/messages`, {
+      const res = await fetch(`/api/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fromAddress: myAddress, toAddress: partnerAddress, text: text.trim() }),
       })
-      if (!res.ok) return false
+      if (!res.ok) {
+        console.error('[useMessages] send failed', res.status, await res.text().catch(() => ''))
+        return false
+      }
       void fetchMsgs()
       return true
-    } catch { return false }
+    } catch (err) {
+      console.error('[useMessages] send error', err)
+      return false
+    }
   }, [myAddress, partnerAddress, fetchMsgs])
 
   const markRead = useCallback(async () => {
     if (!myAddress || !partnerAddress) return
     try {
-      await fetch(`${apiBase()}/api/messages/read`, {
+      await fetch(`/api/messages/read`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ myAddress, partnerAddress }),

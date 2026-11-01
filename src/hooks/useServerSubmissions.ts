@@ -10,11 +10,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Submission, DeliverableLink } from '@/types/bounty'
 
-const AI_BASE = (import.meta.env['VITE_AI_SERVER_URL'] as string | undefined)?.replace(/\/$/, '') ?? ''
-
-function apiUrl(path: string) {
-  return AI_BASE ? `${AI_BASE}${path}` : path
-}
+// Relative paths — works in dev (Vite proxy) and production (Vercel functions).
+function apiUrl(path: string) { return path }
 
 export interface ServerSubmitParams {
   bountyId: string
@@ -119,7 +116,7 @@ export function useServerSubmissions(bountyId?: string): UseServerSubmissionsRes
     creatorNote?: string,
   ) => {
     try {
-      const res = await fetch(apiUrl(`/api/submissions/${submissionId}`), {
+      const res = await fetch(apiUrl(`/api/submissions?id=${encodeURIComponent(submissionId)}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, callerAddress, creatorNote }),

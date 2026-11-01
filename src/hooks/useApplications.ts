@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const AI_BASE = import.meta.env.VITE_AI_SERVER_URL as string | undefined
-
-function apiBase(): string {
-  return AI_BASE ? AI_BASE.replace(/\/$/, '') : ''
-}
-
 export interface JobApplication {
   id: string
   jobId: string
@@ -31,7 +25,7 @@ export function useApplications(params: {
     if (params.applicantAddress) q.set('applicantAddress', params.applicantAddress)
     if (params.jobOwner) q.set('jobOwner', params.jobOwner)
     try {
-      const res = await fetch(`${apiBase()}/api/applications?${q.toString()}`)
+      const res = await fetch(`/api/applications?${q.toString()}`)
       if (!res.ok) return
       const data = await res.json() as { ok: boolean; applications: JobApplication[] }
       if (data.ok) setApplications(data.applications)
@@ -49,15 +43,20 @@ export function useApplications(params: {
     jobId: string; jobTitle: string; jobOwner: string; applicantAddress: string; message: string
   }): Promise<{ ok: true } | { ok: false; error: string }> => {
     try {
-      const res = await fetch(`${apiBase()}/api/applications`, {
+      const res = await fetch(`/api/applications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(p),
       })
-      const data = await res.json() as { ok: boolean; error?: string }
-      if (data.ok) { void fetch_(); return { ok: true } }
-      return { ok: false, error: data.error ?? 'Failed to apply.' }
-    } catch { return { ok: false, error: 'Network error.' } }
+      const text = await res.text()
+      let data: { ok: boolean; error?: string } | null = null
+      try { data = JSON.parse(text) as { ok: boolean; error?: string } } catch { /* not JSON */ }
+      if (data?.ok) { void fetch_(); return { ok: true } }
+      return { ok: false, error: data?.error ?? (res.ok ? 'Failed to apply.' : `Server error (${res.status}). The service may be starting up — try again in a moment.`) }
+    } catch (err) {
+      console.error('[useApplications] apply error', err)
+      return { ok: false, error: 'Could not reach the server. Check your connection and try again.' }
+    }
   }, [fetch_])
 
   const updateStatus = useCallback(async (
@@ -66,15 +65,20 @@ export function useApplications(params: {
     callerAddress: string,
   ): Promise<{ ok: true } | { ok: false; error: string }> => {
     try {
-      const res = await fetch(`${apiBase()}/api/applications/${applicationId}`, {
+      const res = await fetch(`/api/applications?id=${encodeURIComponent(applicationId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, callerAddress }),
       })
-      const data = await res.json() as { ok: boolean; error?: string }
-      if (data.ok) { void fetch_(); return { ok: true } }
-      return { ok: false, error: data.error ?? 'Failed to update.' }
-    } catch { return { ok: false, error: 'Network error.' } }
+      const text = await res.text()
+      let data: { ok: boolean; error?: string } | null = null
+      try { data = JSON.parse(text) as { ok: boolean; error?: string } } catch { /* not JSON */ }
+      if (data?.ok) { void fetch_(); return { ok: true } }
+      return { ok: false, error: data?.error ?? (res.ok ? 'Failed to update.' : `Server error (${res.status}). Try again in a moment.`) }
+    } catch (err) {
+      console.error('[useApplications] updateStatus error', err)
+      return { ok: false, error: 'Could not reach the server. Check your connection and try again.' }
+    }
   }, [fetch_])
 
   return { applications, apply, updateStatus, refresh: fetch_ }

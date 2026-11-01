@@ -40,9 +40,8 @@ import type {
 // ---------------------------------------------------------------------------
 // API base URL
 // ---------------------------------------------------------------------------
-// In dev: relative paths work because Vite proxies /api → localhost:3001.
-// In production (Vercel + Railway): VITE_AI_SERVER_URL points to the Railway URL.
-const AI_BASE = (import.meta.env.VITE_AI_SERVER_URL as string | undefined)?.replace(/\/$/, '') ?? ''
+// API calls use relative /api/* paths — works in dev (Vite proxy) and production (Vercel functions).
+const AI_BASE = ''
 
 // ---------------------------------------------------------------------------
 // Storage key
