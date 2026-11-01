@@ -1,27 +1,36 @@
 /**
- * Upstash Redis REST helper — zero SDK, plain fetch.
- * Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in Vercel env vars.
+ * KV store helper — works with Vercel KV (built-in, free) or Upstash Redis REST.
  *
- * Falls back to an in-process Map when env vars are absent (local dev / preview
- * without KV configured) — data is lost on cold-start in that mode.
+ * Vercel KV env vars (set automatically when you add KV in Vercel dashboard):
+ *   KV_REST_API_URL, KV_REST_API_TOKEN
+ *
+ * Upstash env vars (alternative):
+ *   UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+ *
+ * Falls back to an in-process Map when neither is set (local dev only —
+ * data is lost between requests in production without KV configured).
  */
 
-const REDIS_URL = process.env['UPSTASH_REDIS_REST_URL']
-const REDIS_TOKEN = process.env['UPSTASH_REDIS_REST_TOKEN']
+const REDIS_URL =
+  process.env['KV_REST_API_URL'] ??
+  process.env['UPSTASH_REDIS_REST_URL']
 
-// In-memory fallback for local dev
+const REDIS_TOKEN =
+  process.env['KV_REST_API_TOKEN'] ??
+  process.env['UPSTASH_REDIS_REST_TOKEN']
+
+// In-memory fallback for local dev (lost between requests in serverless!)
 const memStore = new Map<string, string>()
 
 async function redisCmd(...args: (string | number)[]): Promise<unknown> {
   if (!REDIS_URL || !REDIS_TOKEN) {
-    // Local fallback — implement only what we use
     const [cmd, key, ...rest] = args
     if (cmd === 'GET') return memStore.get(String(key)) ?? null
     if (cmd === 'SET') { memStore.set(String(key), String(rest[0])); return 'OK' }
     if (cmd === 'DEL') { memStore.delete(String(key)); return 1 }
     return null
   }
-  const res = await fetch(`${REDIS_URL}`, {
+  const res = await fetch(REDIS_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${REDIS_TOKEN}`,
@@ -47,12 +56,10 @@ export async function kdel(key: string): Promise<void> {
   await redisCmd('DEL', key)
 }
 
-/** Read a JSON array stored at `key`, defaulting to []. */
 export async function kgetList<T>(key: string): Promise<T[]> {
   return (await kget<T[]>(key)) ?? []
 }
 
-/** Overwrite a JSON array at `key`. */
 export async function ksetList<T>(key: string, list: T[]): Promise<void> {
   await kset(key, list)
 }
