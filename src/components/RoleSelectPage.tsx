@@ -88,21 +88,13 @@ export function RoleSelectPage({ onChoose }: RoleSelectPageProps) {
             <button
               key={r.id}
               onClick={() => onChoose(r.id)}
-              className="flex-1 text-left rounded-2xl p-6 border transition-all duration-150 group"
+              className="flex-1 text-left rounded-2xl p-6 border transition-all duration-150 group active:scale-[0.98]"
               style={{
                 background: r.gradient,
                 borderColor: r.border,
                 boxShadow: 'var(--shadow-card)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = `0 8px 32px ${r.accentSoft}, 0 2px 8px rgba(17,24,39,0.08)`
-                e.currentTarget.style.borderColor = r.accent
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = 'var(--shadow-card)'
-                e.currentTarget.style.borderColor = r.border
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
               {/* Icon */}

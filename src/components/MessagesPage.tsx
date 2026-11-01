@@ -4,7 +4,7 @@
  * Custom order offers can be sent inline from the thread.
  */
 import { useState, useEffect, useRef } from 'react'
-import { Send, MessageSquare, ArrowLeft, Package, Loader2, CheckCheck } from 'lucide-react'
+import { Send, MessageSquare, ArrowLeft, Package, Loader2, CheckCheck, AlertCircle } from 'lucide-react'
 import { useMessages, useConversation } from '@/hooks/useMessages'
 import { useOrders } from '@/hooks/useOrders'
 import { formatAddress } from '@/lib/utils'
@@ -128,6 +128,7 @@ function Thread({
   const { placeOrder } = useOrders(myAddress)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
   const [showOfferForm, setShowOfferForm] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -138,9 +139,15 @@ function Thread({
 
   function handleSend(e: React.FormEvent): void {
     e.preventDefault()
-    if (!text.trim()) return
+    const msg = text.trim()
+    if (!msg || sending) return
     setSending(true)
-    void send(text.trim()).then(() => { setText(''); setSending(false) })
+    setSendError('')
+    void send(msg).then((ok) => {
+      setSending(false)
+      if (ok) { setText('') }
+      else { setSendError('Failed to send. Check your connection and try again.') }
+    })
   }
 
   async function handleSendOffer(params: { title: string; description: string; price: number; days: number }) {
@@ -238,6 +245,15 @@ function Thread({
             onSend={handleSendOffer}
             onCancel={() => setShowOfferForm(false)}
           />
+        </div>
+      )}
+
+      {/* Send error */}
+      {sendError && (
+        <div className="flex items-center gap-2 mx-4 mb-1 px-3 py-2 rounded-xl text-xs"
+          style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>
+          <AlertCircle size={13} />
+          {sendError}
         </div>
       )}
 
@@ -392,7 +408,10 @@ export function MessagesPage({ myAddress, initialPartner, role, onNavigate: _onN
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
         <MessageSquare size={32} className="mx-auto mb-4" style={{ color: 'var(--subtle)' }} />
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>Sign in to view your messages.</p>
+        <p className="text-sm font-600 mb-1" style={{ color: 'var(--ink)' }}>Sign in to view your messages</p>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          You need to be signed in with a wallet address to send and receive messages.
+        </p>
       </div>
     )
   }

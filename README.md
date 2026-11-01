@@ -1,6 +1,6 @@
-# VERITAS — Onchain Bounty Platform
+# VERIPAY — Onchain Job Platform
 
-VERITAS lets project owners create USDC-backed work bounties on the Arc blockchain, receive submissions from contributors, and release payment automatically through an escrow smart contract when work is approved.
+VERIPAY connects creators and freelancers on the Arc blockchain. Creators post jobs and place orders; freelancers post gigs and deliver work. All payments are USDC via escrow. Features: real-time messaging, order management with countdown timers, custom offers, job application/approval flow, and gig share links.
 
 Built with [Arc Studio](https://studio.arc.io)
 

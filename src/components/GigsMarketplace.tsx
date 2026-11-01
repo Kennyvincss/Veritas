@@ -5,7 +5,7 @@
 
 import { useState, useMemo } from 'react'
 import { Search, Briefcase, Star, Clock, ExternalLink, Tag, Share2, Check } from 'lucide-react'
-import { useGigs } from '@/hooks/useGigs'
+import { useServerGigs } from '@/hooks/useServerGigs'
 import { useProfiles } from '@/hooks/useProfiles'
 import { formatAddress } from '@/lib/utils'
 import type { Gig, GigCategory } from '@/types/gig'
@@ -185,7 +185,7 @@ interface GigsMarketplaceProps {
 }
 
 export function GigsMarketplace({ onNavigate, myAddress, onOrderGig }: GigsMarketplaceProps) {
-  const { gigs } = useGigs()
+  const { gigs } = useServerGigs()
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<GigCategory | 'all'>('all')
 

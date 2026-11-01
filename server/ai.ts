@@ -96,7 +96,7 @@ function corsMiddleware(req: Request, res: ExpressResponse, next: NextFunction) 
   // In dev (Vite proxy), there's no Origin header — allow it
   if (!origin || isAllowedOrigin(origin)) {
     if (origin) res.setHeader('Access-Control-Allow-Origin', origin)
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
     res.setHeader('Vary', 'Origin')
   }
@@ -885,7 +885,7 @@ app.post('/api/messages', (req: Request, res: ExpressResponse) => {
     res.status(400).json({ ok: false, error: 'Cannot message yourself.' }); return
   }
 
-  const now = Math.floor(Date.now() / 1000)
+  const now = Date.now()   // milliseconds — frontend expects ms
   const msg: Message = { id: newId(), fromAddress, toAddress, text, createdAt: now, read: false }
   messages.push(msg)
 
@@ -955,6 +955,73 @@ app.post('/api/messages/read', (req: Request, res: ExpressResponse) => {
   messages.forEach((m) => {
     if (m.toAddress === myAddress && m.fromAddress === partnerAddress) m.read = true
   })
+  res.json({ ok: true })
+})
+
+// ── Gigs (server-side so all users see each other's gigs) ────────────────────
+
+interface ServerGig {
+  id: string
+  title: string
+  description: string
+  category: string
+  deliverables: string
+  startingPrice: number
+  turnaround: string
+  freelancerAddress: string
+  portfolioLinks: string[]
+  tags: string[]
+  createdAt: number
+}
+
+const serverGigs: ServerGig[] = []
+
+// GET /api/gigs — list all (optionally filter by freelancerAddress)
+app.get('/api/gigs', (req: Request, res: ExpressResponse) => {
+  const { freelancerAddress } = req.query
+  if (typeof freelancerAddress === 'string' && freelancerAddress) {
+    const addr = freelancerAddress.toLowerCase()
+    res.json({ ok: true, gigs: serverGigs.filter((g) => g.freelancerAddress === addr) })
+    return
+  }
+  res.json({ ok: true, gigs: serverGigs })
+})
+
+// POST /api/gigs — create a gig
+app.post('/api/gigs', (req: Request, res: ExpressResponse) => {
+  const b = req.body as Record<string, unknown>
+  const title = typeof b['title'] === 'string' ? b['title'].trim() : ''
+  const description = typeof b['description'] === 'string' ? b['description'].trim() : ''
+  const category = typeof b['category'] === 'string' ? b['category'] : 'other'
+  const deliverables = typeof b['deliverables'] === 'string' ? b['deliverables'].trim() : ''
+  const startingPrice = typeof b['startingPrice'] === 'number' ? b['startingPrice'] : 0
+  const turnaround = typeof b['turnaround'] === 'string' ? b['turnaround'].trim() : 'Flexible'
+  const freelancerAddress = typeof b['freelancerAddress'] === 'string' ? b['freelancerAddress'].toLowerCase() : ''
+  const portfolioLinks = Array.isArray(b['portfolioLinks']) ? (b['portfolioLinks'] as string[]) : []
+  const tags = Array.isArray(b['tags']) ? (b['tags'] as string[]) : []
+
+  if (!title || !description || !freelancerAddress || startingPrice <= 0) {
+    res.status(400).json({ ok: false, error: 'title, description, freelancerAddress and startingPrice are required.' })
+    return
+  }
+
+  const gig: ServerGig = {
+    id: `gig_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    title, description, category, deliverables, startingPrice, turnaround,
+    freelancerAddress, portfolioLinks, tags, createdAt: Date.now(),
+  }
+  serverGigs.unshift(gig)
+  if (serverGigs.length > 500) serverGigs.splice(500)
+  res.json({ ok: true, gig })
+})
+
+// DELETE /api/gigs/:id — delete own gig
+app.delete('/api/gigs/:id', (req: Request, res: ExpressResponse) => {
+  const { id } = req.params
+  const callerAddress = (typeof req.body?.['callerAddress'] === 'string' ? req.body['callerAddress'] : '').toLowerCase()
+  const idx = serverGigs.findIndex((g) => g.id === id && g.freelancerAddress === callerAddress)
+  if (idx === -1) { res.status(404).json({ ok: false, error: 'Gig not found or not yours.' }); return }
+  serverGigs.splice(idx, 1)
   res.json({ ok: true })
 })
 

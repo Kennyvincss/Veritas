@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { Briefcase, Plus, X, ChevronRight } from 'lucide-react'
-import { useGigs } from '@/hooks/useGigs'
+import { useServerGigs } from '@/hooks/useServerGigs'
 import { useAccount } from '@/hooks/useAccount'
 import { PrivyLoginButton } from '@/components/PrivyLoginButton'
 import type { GigCategory } from '@/types/gig'
@@ -27,7 +27,7 @@ interface PostGigPageProps {
 
 export function PostGigPage({ onNavigate, onGigPosted }: PostGigPageProps) {
   const { address, isConnected } = useAccount()
-  const { postGig } = useGigs()
+  const { postGig } = useServerGigs()
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -41,6 +41,7 @@ export function PostGigPage({ onNavigate, onGigPosted }: PostGigPageProps) {
   const [portfolioLinks, setPortfolioLinks] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   if (!isConnected || !address) {
     return (
@@ -108,30 +109,29 @@ export function PostGigPage({ onNavigate, onGigPosted }: PostGigPageProps) {
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent): void {
     e.preventDefault()
     if (!address || isSubmitting) return
     const price = parseFloat(startingPrice)
     if (!title.trim() || !description.trim() || !deliverables.trim() || isNaN(price) || price <= 0) return
 
     setIsSubmitting(true)
-    try {
-      postGig({
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        deliverables: deliverables.trim(),
-        startingPrice: price,
-        turnaround: turnaround.trim() || 'Flexible',
-        freelancerAddress: address,
-        portfolioLinks,
-        tags,
-      })
-      onGigPosted()
-      setSubmitted(true)
-    } finally {
+    setSubmitError('')
+    void postGig({
+      title: title.trim(),
+      description: description.trim(),
+      category,
+      deliverables: deliverables.trim(),
+      startingPrice: price,
+      turnaround: turnaround.trim() || 'Flexible',
+      freelancerAddress: address,
+      portfolioLinks,
+      tags,
+    }).then((result) => {
       setIsSubmitting(false)
-    }
+      if (result.ok) { onGigPosted(); setSubmitted(true) }
+      else { setSubmitError(result.error) }
+    })
   }
 
   const isValid = title.trim().length > 0
@@ -351,6 +351,13 @@ export function PostGigPage({ onNavigate, onGigPosted }: PostGigPageProps) {
             </button>
           </div>
         </div>
+
+        {/* Error */}
+        {submitError && (
+          <div className="px-4 py-3 rounded-xl text-sm" style={{ background: '#fee2e2', color: '#b91c1c' }}>
+            {submitError}
+          </div>
+        )}
 
         {/* Submit */}
         <button
