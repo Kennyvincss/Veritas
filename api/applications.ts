@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { kgetList, ksetList, uid } from './_redis'
+import { kgetList, ksetList, uid, parseBody } from './_redis'
 
 const KEY = 'veripay:applications'
 
@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const b = req.body as Record<string, unknown>
+    const b = await parseBody(req)
     const jobId = typeof b['jobId'] === 'string' ? b['jobId'] : ''
     const jobTitle = typeof b['jobTitle'] === 'string' ? b['jobTitle'].trim().slice(0, 200) : ''
     const jobOwner = typeof b['jobOwner'] === 'string' ? b['jobOwner'].toLowerCase() : ''
@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'PATCH') {
     const id = typeof req.query['id'] === 'string' ? req.query['id'] : ''
-    const b = req.body as Record<string, unknown>
+    const b = await parseBody(req)
     const status = typeof b['status'] === 'string' ? b['status'] : ''
     const callerAddress = typeof b['callerAddress'] === 'string' ? b['callerAddress'].toLowerCase() : ''
     const idx = applications.findIndex((a) => a.id === id)
@@ -75,3 +75,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.status(405).json({ ok: false, error: 'Method not allowed' })
 }
+
+export const config = { api: { bodyParser: false } }

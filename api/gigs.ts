@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { kgetList, ksetList, uid } from './_redis'
+import { kgetList, ksetList, uid, parseBody } from './_redis'
 
 const KEY = 'veripay:gigs'
 
@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const b = req.body as Record<string, unknown>
+    const b = await parseBody(req)
     const title = typeof b['title'] === 'string' ? b['title'].trim() : ''
     const description = typeof b['description'] === 'string' ? b['description'].trim() : ''
     const freelancerAddress = typeof b['freelancerAddress'] === 'string' ? b['freelancerAddress'].toLowerCase() : ''
@@ -53,8 +53,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'DELETE') {
     const id = typeof req.query['id'] === 'string' ? req.query['id'] : ''
-    const callerAddress = (typeof (req.body as Record<string, unknown>)?.['callerAddress'] === 'string'
-      ? (req.body as Record<string, unknown>)['callerAddress'] as string : '').toLowerCase()
+    const bd = await parseBody(req)
+    const callerAddress = (typeof bd['callerAddress'] === 'string' ? bd['callerAddress'] : '').toLowerCase()
     const idx = gigs.findIndex((g) => g.id === id && g.freelancerAddress === callerAddress)
     if (idx === -1) { res.status(404).json({ ok: false, error: 'Gig not found or not yours.' }); return }
     gigs.splice(idx, 1)
@@ -64,3 +64,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.status(405).json({ ok: false, error: 'Method not allowed' })
 }
+
+export const config = { api: { bodyParser: false } }

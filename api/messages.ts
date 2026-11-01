@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { kgetList, ksetList, uid } from './_redis'
+import { kgetList, ksetList, uid, parseBody } from './_redis'
 
 const KEY = 'veripay:messages'
 
@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const b = req.body as Record<string, unknown>
+    const b = await parseBody(req)
     const fromAddress = typeof b['fromAddress'] === 'string' ? b['fromAddress'].toLowerCase() : ''
     const toAddress = typeof b['toAddress'] === 'string' ? b['toAddress'].toLowerCase() : ''
     const text = typeof b['text'] === 'string' ? b['text'].trim() : ''
@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'PATCH') {
     // Mark messages as read
-    const b = req.body as Record<string, unknown>
+    const b = await parseBody(req)
     const myAddress = typeof b['myAddress'] === 'string' ? b['myAddress'].toLowerCase() : ''
     const partnerAddress = typeof b['partnerAddress'] === 'string' ? b['partnerAddress'].toLowerCase() : ''
     if (!myAddress || !partnerAddress) { res.status(400).json({ ok: false, error: 'myAddress and partnerAddress required' }); return }
@@ -77,3 +77,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.status(405).json({ ok: false, error: 'Method not allowed' })
 }
+
+export const config = { api: { bodyParser: false } }

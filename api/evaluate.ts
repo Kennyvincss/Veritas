@@ -95,3 +95,5 @@ Respond with a JSON object (no markdown, raw JSON only) with these exact fields:
     res.status(500).json({ error: 'Internal server error.' })
   }
 }
+
+export const config = { api: { bodyParser: false } }

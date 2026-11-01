@@ -68,3 +68,27 @@ function uid(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }
 export { uid }
+
+/**
+ * Parse JSON body from a Vercel request.
+ * @vercel/node v3+ does NOT auto-parse — body may be undefined or a raw Buffer/string.
+ */
+export async function parseBody(req: import('@vercel/node').VercelRequest): Promise<Record<string, unknown>> {
+  // Already parsed (some runtimes do parse it)
+  if (req.body !== undefined && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    return req.body as Record<string, unknown>
+  }
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8')
+        resolve(raw ? JSON.parse(raw) as Record<string, unknown> : {})
+      } catch {
+        resolve({})
+      }
+    })
+    req.on('error', () => resolve({}))
+  })
+}

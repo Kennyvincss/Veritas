@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { kgetList, ksetList, uid } from './_redis'
+import { kgetList, ksetList, uid, parseBody } from './_redis'
 
 const KEY = 'veripay:orders'
 
@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const b = req.body as Record<string, unknown>
+    const b = await parseBody(req)
     const creatorAddress = typeof b['creatorAddress'] === 'string' ? b['creatorAddress'].toLowerCase() : ''
     const freelancerAddress = typeof b['freelancerAddress'] === 'string' ? b['freelancerAddress'].toLowerCase() : ''
     const price = typeof b['price'] === 'number' ? b['price'] : 0
@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'PATCH') {
     const id = typeof req.query['id'] === 'string' ? req.query['id'] : ''
-    const b = req.body as Record<string, unknown>
+    const b = await parseBody(req)
     const idx = orders.findIndex((o) => o.id === id)
     if (idx === -1) { res.status(404).json({ ok: false, error: 'Order not found.' }); return }
     const order = orders[idx]!
@@ -87,3 +87,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.status(405).json({ ok: false, error: 'Method not allowed' })
 }
+
+export const config = { api: { bodyParser: false } }
